@@ -1,30 +1,32 @@
+use crate::grid::Grid;
 use eframe::{egui, epi};
+use egui::plot::{Value, Values, Points, Plot};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
-pub struct TemplateApp {
+pub struct OwlWaveApp {
     // Example stuff:
     label: String,
 
     // this how you opt-out of serialization of a member
     #[cfg_attr(feature = "persistence", serde(skip))]
-    value: f32,
+    grid: Grid,
 }
 
-impl Default for TemplateApp {
+impl Default for OwlWaveApp {
     fn default() -> Self {
         Self {
             // Example stuff:
-            label: "Hello World!".to_owned(),
-            value: 2.7,
+            label: "Owl Wave".to_owned(),
+            grid: Grid::new(8, 8, 256),
         }
     }
 }
 
-impl epi::App for TemplateApp {
+impl epi::App for OwlWaveApp {
     fn name(&self) -> &str {
-        "eframe template"
+        self.label.as_str()
     }
 
     /// Called once before the first frame.
@@ -34,12 +36,17 @@ impl epi::App for TemplateApp {
         _frame: &epi::Frame,
         _storage: Option<&dyn epi::Storage>,
     ) {
+        //self.fft_context = start_fft_thread();
+        //let mut planner = get_fft_planner();
+
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
-        #[cfg(feature = "persistence")]
-        if let Some(storage) = _storage {
-            *self = epi::get_value(storage, epi::APP_KEY).unwrap_or_default()
-        }
+        //#[cfg(feature = "persistence")]
+        //if let Some(storage) = _storage {
+        //    *self = epi::get_value(storage, epi::APP_KEY).unwrap_or_default()
+        //}
+
+        //self.grid = Grid::new(8, 8, 256)
     }
 
     /// Called by the frame work to save state before shutdown.
@@ -52,7 +59,7 @@ impl epi::App for TemplateApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
-        let Self { label, value } = self;
+        //let Self { label, grid } = self;
 
         // Examples of how to create different panels and windows.
         // Pick whichever suits you.
@@ -71,17 +78,32 @@ impl epi::App for TemplateApp {
         });
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
-            ui.heading("Side Panel");
+            ui.heading("Wavetables");
 
-            ui.horizontal(|ui| {
-                ui.label("Write something: ");
-                ui.text_edit_singleline(label);
+            egui::ScrollArea::vertical().show(ui,|ui| {
+                // ui.text_edit_singleline(label);
+                for i in 0..self.grid.get_waves() {
+                    ui.label(i.to_string());
+                    let samples = self.grid.get_samples() as f64;
+                    let points = Points::new(
+                        Values::from_values(self.grid.get_wave_by_id(i)
+                            .iter()
+                            .enumerate()
+                            .map(|(i,&v)| Value::new(i as f64 / samples, v))
+                            .collect()))
+                        .stems(-1.5)
+                        .radius(1.0);                    
+                        //ui.points(points.name("Points with stems"));
+                    let plot = Plot::new("Points").view_aspect(1.0).allow_drag(false).show_axes([false,true]);
+                    //ui.add(plot);
+                    plot.show(ui, |plot_ui|{plot_ui.points(points.name("points with stems"))});
+                }
             });
 
-            ui.add(egui::Slider::new(value, 0.0..=10.0).text("value"));
-            if ui.button("Increment").clicked() {
-                *value += 1.0;
-            }
+            //ui.add(egui::Slider::new(value, 0.0..=10.0).text("value"));
+            //if ui.button("Increment").clicked() {
+            //    *value += 1.0;
+            //}
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 ui.horizontal(|ui| {

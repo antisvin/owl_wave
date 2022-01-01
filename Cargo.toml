@@ -1,7 +1,7 @@
 [package]
-name = "eframe_template"
+name = "owl_wave"
 version = "0.1.0"
-authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
+authors = ["Stas Shtin <antisvin@gmail.com>"]
 edition = "2021"
 rust-version = "1.56"
 
@@ -12,8 +12,12 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 eframe = "0.16.0" # Gives us egui, epi and web+native backends
-
 serde = { version = "1", features = ["derive"], optional = true }
+wavetable = { git = "https://github.com/icsga/Wavetable.git", version = "0.2.0", features = ["use_double_precision"] }
+# default_features = false }
+#, features = ["use_double_precision"] }
+#basic_dsp = "0.9.4"
+#rustfft = "6.0.1"
 
 [features]
 default = []
