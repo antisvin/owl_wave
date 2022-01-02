@@ -15,11 +15,13 @@ pub struct OwlWaveApp {
     grid: Grid,
 }
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 impl Default for OwlWaveApp {
     fn default() -> Self {
         Self {
             // Example stuff:
-            label: "Owl Wave".to_owned(),
+            label: format!("Owl Wave {}", VERSION),
             active_wave_id: 0,
             grid: Grid::new(8, 8, 256),
         }
@@ -106,7 +108,7 @@ impl epi::App for OwlWaveApp {
                     let plot = plot.show_background(self.active_wave_id == i);
                     let response = plot
                         .show(ui, |plot_ui| {
-                            plot_ui.points(points.name("points with stems"))
+                            plot_ui.points(points)
                         })
                         .response;
                     if response.clicked() {
@@ -146,7 +148,31 @@ impl epi::App for OwlWaveApp {
         });
 
         egui::Window::new("Wavetable").show(ctx, |ui| {
-            ui.label("Windows can be moved by dragging them.");
+            let samples = self.grid.get_samples() as f64;
+            let points = Points::new(Values::from_values(
+                self.grid
+                    .get_wave_by_id(self.active_wave_id)
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &v)| Value::new(i as f64 / samples, v))
+                    .collect(),
+            ))
+            .stems(-1.5)
+            .radius(1.0);
+            //ui.points(points.name("Points with stems"));
+            let plot = Plot::new("Points")
+                .view_aspect(1.0)
+                .allow_drag(false)
+                .show_axes([false, true]);
+            //ui.add(plot);
+            let _response = plot
+                .show(ui, |plot_ui| {
+                    plot_ui.points(points)
+                })
+                .response;
+            //if response.clicked() {
+            //    self.active_wave_id = i
+            //}
         });
         egui::Window::new("Grid").show(ctx, |ui| {
             ui.label("Wavetables grid");

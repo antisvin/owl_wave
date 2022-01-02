@@ -2,6 +2,6 @@
     "rust-analyzer.updates.askBeforeDownload": false,
     "rust-analyzer.checkOnSave.command": "clippy",
     "rust-client.rustupPath": "/home/antisvin/.cargo/bin/rustup",
-    "rust-client.engine": "rust-analyzer"
+    "rust-client.engine": "rust-analyzer",
 }
     
