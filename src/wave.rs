@@ -1,6 +1,6 @@
-use rustfft::{FftPlanner, num_traits::Zero};
 use rustfft::num_complex::Complex;
-use wavetable::{Harmonic, Float};
+use rustfft::{num_traits::Zero, FftPlanner};
+use wavetable::{Float, Harmonic};
 //use crate::effects::Effect;
 
 // Magnitude + phase
@@ -9,7 +9,7 @@ pub type Polar = (f64, f64);
 pub struct WaveState {
     time_domain: Vec<Float>,
     freq_domain: Vec<Harmonic>,
-    polar: Vec<Polar>
+    polar: Vec<Polar>,
 }
 
 impl WaveState {

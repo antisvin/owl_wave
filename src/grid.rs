@@ -4,7 +4,7 @@ pub struct Grid {
     rows: usize,
     cols: usize,
     samples: usize,
-    wavetable: Wavetable
+    wavetable: Wavetable,
 }
 
 impl Grid {
@@ -13,19 +13,18 @@ impl Grid {
             rows,
             cols,
             samples,
-            wavetable: Wavetable::new(rows * cols, 1,samples)
+            wavetable: Wavetable::new(rows * cols, 1, samples),
         };
         for i in 0..rows {
             for j in 0..cols {
                 let wave = grid.wavetable.get_wave_mut(i * rows + j);
-                if j & 1 == 1{
+                if j & 1 == 1 {
                     Wavetable::add_cosine_wave(wave, 1.0, 1.0, 0.0);
-                }
-                else {
+                } else {
                     Wavetable::add_sine_wave(wave, 1.0, 1.0, 0.0);
                 }
-	        }
-        };
+            }
+        }
         grid
     }
     /*
@@ -47,7 +46,7 @@ impl Grid {
         self.wavetable.get_wave_mut(row * self.cols + col)
     }
     */
-    pub fn get_wave_by_id(&self, i: usize) -> &Vec<f64>{
+    pub fn get_wave_by_id(&self, i: usize) -> &Vec<f64> {
         self.wavetable.get_wave(i)
     }
     /*
