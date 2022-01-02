@@ -3,9 +3,9 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 mod app;
-//mod wavetable;
 mod grid;
 mod wave;
+//mod effects;
 pub use app::OwlWaveApp;
 
 // ----------------------------------------------------------------------------

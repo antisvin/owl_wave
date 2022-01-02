@@ -8,6 +8,7 @@ use egui::plot::{Value, Values, Points, Plot};
 pub struct OwlWaveApp {
     // Example stuff:
     label: String,
+    active_wave_id: usize,
 
     // this how you opt-out of serialization of a member
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -19,6 +20,7 @@ impl Default for OwlWaveApp {
         Self {
             // Example stuff:
             label: "Owl Wave".to_owned(),
+            active_wave_id: 0,
             grid: Grid::new(8, 8, 256),
         }
     }
@@ -41,10 +43,10 @@ impl epi::App for OwlWaveApp {
 
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
-        //#[cfg(feature = "persistence")]
-        //if let Some(storage) = _storage {
-        //    *self = epi::get_value(storage, epi::APP_KEY).unwrap_or_default()
-        //}
+        #[cfg(feature = "persistence")]
+        if let Some(storage) = _storage {
+            *self = epi::get_value(storage, epi::APP_KEY).unwrap_or_default()
+        }
 
         //self.grid = Grid::new(8, 8, 256)
     }
@@ -80,10 +82,10 @@ impl epi::App for OwlWaveApp {
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             ui.heading("Wavetables");
 
+            //egui::Grid::new("tables list").show(ui,|ui| {
             egui::ScrollArea::vertical().show(ui,|ui| {
-                // ui.text_edit_singleline(label);
                 for i in 0..self.grid.get_waves() {
-                    ui.label(i.to_string());
+                    //ui.label(i.to_string());
                     let samples = self.grid.get_samples() as f64;
                     let points = Points::new(
                         Values::from_values(self.grid.get_wave_by_id(i)
@@ -94,9 +96,19 @@ impl epi::App for OwlWaveApp {
                         .stems(-1.5)
                         .radius(1.0);                    
                         //ui.points(points.name("Points with stems"));
-                    let plot = Plot::new("Points").view_aspect(1.0).allow_drag(false).show_axes([false,true]);
+                    let plot = Plot::new("Points")
+                        .view_aspect(1.0)
+                        .allow_drag(false)
+                        .show_axes([false,true]);
                     //ui.add(plot);
-                    plot.show(ui, |plot_ui|{plot_ui.points(points.name("points with stems"))});
+                    let plot  = plot.show_background(self.active_wave_id == i);
+                    let response = plot.show(
+                        ui, |plot_ui|{plot_ui.points(points.name("points with stems"))}).response;
+                    if response.clicked() {
+                        self.active_wave_id = i
+                    }
+                    //ui.add(plot);
+                    //ui.end_row();
                 }
             });
 
@@ -120,21 +132,19 @@ impl epi::App for OwlWaveApp {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
             ui.heading("eframe template");
-            ui.hyperlink("https://github.com/emilk/eframe_template");
+            ui.hyperlink("https://github.com/antisvin/owl_wave");
             ui.add(egui::github_link_file!(
-                "https://github.com/emilk/eframe_template/blob/master/",
+                "https://github.com/antisvin/owl_wave/blob/master/",
                 "Source code."
             ));
             egui::warn_if_debug_build(ui);
         });
 
-        if false {
-            egui::Window::new("Window").show(ctx, |ui| {
-                ui.label("Windows can be moved by dragging them.");
-                ui.label("They are automatically sized based on contents.");
-                ui.label("You can turn on resizing and scrolling if you like.");
-                ui.label("You would normally chose either panels OR windows.");
-            });
-        }
+        egui::Window::new("Wavetable").show(ctx, |ui| {
+            ui.label("Windows can be moved by dragging them.");
+        });
+        egui::Window::new("Grid").show(ctx, |ui| {
+            ui.label("Wavetables grid");
+        });        
     }
 }

@@ -1120,6 +1120,7 @@ name = "owl_wave"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "rustfft",
  "serde",
  "wavetable",
 ]

@@ -17,7 +17,7 @@ wavetable = { git = "https://github.com/icsga/Wavetable.git", version = "0.2.0",
 # default_features = false }
 #, features = ["use_double_precision"] }
 #basic_dsp = "0.9.4"
-#rustfft = "6.0.1"
+rustfft = "5.0.0"
 
 [features]
 default = []
