@@ -106,11 +106,7 @@ impl epi::App for OwlWaveApp {
                         .show_axes([false, true]);
                     //ui.add(plot);
                     let plot = plot.show_background(self.active_wave_id == i);
-                    let response = plot
-                        .show(ui, |plot_ui| {
-                            plot_ui.points(points)
-                        })
-                        .response;
+                    let response = plot.show(ui, |plot_ui| plot_ui.points(points)).response;
                     if response.clicked() {
                         self.active_wave_id = i
                     }
@@ -165,11 +161,7 @@ impl epi::App for OwlWaveApp {
                 .allow_drag(false)
                 .show_axes([false, true]);
             //ui.add(plot);
-            let _response = plot
-                .show(ui, |plot_ui| {
-                    plot_ui.points(points)
-                })
-                .response;
+            let _response = plot.show(ui, |plot_ui| plot_ui.points(points)).response;
             //if response.clicked() {
             //    self.active_wave_id = i
             //}
