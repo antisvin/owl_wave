@@ -15,9 +15,9 @@ repos:
     hooks:
     -   id: validate_manifest
 -   repo: https://github.com/antisvin/owl_wave
-    rev: 2f57e371cc0cbf5a59048836f29f75a6af8c732a
+    rev: 527363b9a68d620b7122987f48057050244584a8
     hooks:
     -   id: fmt
     -   id: cargo-check
     -   id: clippy
-#    -   id: rebuild-web
+    -   id: rebuild-web
