@@ -1,6 +1,6 @@
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.1.0
+    rev: v4.1.0
     hooks:
     -   id: check-byte-order-marker
     -   id: check-case-conflict
@@ -11,6 +11,13 @@ repos:
     -   id: mixed-line-ending
     -   id: trailing-whitespace
 -   repo: https://github.com/pre-commit/pre-commit
-    rev: v2.5.1
+    rev: v2.16.0
     hooks:
     -   id: validate_manifest
+-   repo: https://github.com/antisvin/owl_wave
+    rev: 2f57e371cc0cbf5a59048836f29f75a6af8c732a
+    hooks:
+    -   id: fmt
+    -   id: cargo-check
+    -   id: clippy
+#    -   id: rebuild-web

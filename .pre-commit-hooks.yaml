@@ -21,3 +21,10 @@
   args: ["--", "-D", "warnings"]
   types: [rust]
   pass_filenames: false
+- id: rebuild-web
+  name: rebuild web
+  description: Rebuild web version
+  entry: ./build_web.sh
+  language: system
+  files: \.rs$
+  pass_filenames: false
