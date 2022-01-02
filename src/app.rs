@@ -13,6 +13,8 @@ pub struct OwlWaveApp {
     // this how you opt-out of serialization of a member
     #[cfg_attr(feature = "persistence", serde(skip))]
     grid: Grid,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    dropped_files: Vec<egui::DroppedFile>,
 }
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -24,6 +26,7 @@ impl Default for OwlWaveApp {
             label: format!("Owl Wave {}", VERSION),
             active_wave_id: 0,
             grid: Grid::new(8, 8, 256),
+            dropped_files: Vec::<egui::DroppedFile>::new(),
         }
     }
 }
@@ -74,6 +77,23 @@ impl epi::App for OwlWaveApp {
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
+                    if !frame.is_web() {
+                        //ui.output().open_url(format!("#{}", anchor));
+                        //ui.button(tex)
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if ui.button("Open").clicked() {
+                            if let Some(path) = rfd::FileDialog::new().pick_file() {
+                                let picked_path = Some(path.display().to_string());
+                                if let Some(picked_path) = picked_path {
+                                    ui.horizontal(|ui| {
+                                        ui.label("Picked file:");
+                                        ui.monospace(picked_path);
+                                    });
+                                }
+                            }
+                        }
+                    }
+
                     if ui.button("Quit").clicked() {
                         frame.quit();
                     }
@@ -169,5 +189,72 @@ impl epi::App for OwlWaveApp {
         egui::Window::new("Grid").show(ctx, |ui| {
             ui.label("Wavetables grid");
         });
+
+        //self.backend_panel.end_of_frame(ctx);
+
+        self.ui_file_drag_and_drop(ctx);
+    }
+}
+
+impl OwlWaveApp {
+    fn ui_file_drag_and_drop(&mut self, ctx: &egui::CtxRef) {
+        use egui::*;
+
+        // Preview hovering files:
+        if !ctx.input().raw.hovered_files.is_empty() {
+            let mut text = "Dropping files:\n".to_owned();
+            for file in &ctx.input().raw.hovered_files {
+                if let Some(path) = &file.path {
+                    text += &format!("\n{}", path.display());
+                } else if !file.mime.is_empty() {
+                    text += &format!("\n{}", file.mime);
+                } else {
+                    text += "\n???";
+                }
+            }
+
+            let painter =
+                ctx.layer_painter(LayerId::new(Order::Foreground, Id::new("file_drop_target")));
+
+            let screen_rect = ctx.input().screen_rect();
+            painter.rect_filled(screen_rect, 0.0, Color32::from_black_alpha(192));
+            painter.text(
+                screen_rect.center(),
+                Align2::CENTER_CENTER,
+                text,
+                TextStyle::Heading,
+                Color32::WHITE,
+            );
+        }
+
+        // Collect dropped files:
+        if !ctx.input().raw.dropped_files.is_empty() {
+            self.dropped_files = ctx.input().raw.dropped_files.clone();
+        }
+
+        // Show dropped files (if any):
+        if !self.dropped_files.is_empty() {
+            let mut open = true;
+            egui::Window::new("Dropped files")
+                .open(&mut open)
+                .show(ctx, |ui| {
+                    for file in &self.dropped_files {
+                        let mut info = if let Some(path) = &file.path {
+                            path.display().to_string()
+                        } else if !file.name.is_empty() {
+                            file.name.clone()
+                        } else {
+                            "???".to_owned()
+                        };
+                        if let Some(bytes) = &file.bytes {
+                            info += &format!(" ({} bytes)", bytes.len());
+                        }
+                        ui.label(info);
+                    }
+                });
+            if !open {
+                self.dropped_files.clear();
+            }
+        }
     }
 }
