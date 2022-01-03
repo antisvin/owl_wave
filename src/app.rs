@@ -1,6 +1,10 @@
+use std::fs::File;
+use std::io::Cursor;
+
 use crate::grid::Grid;
 use eframe::{egui, epi};
 use egui::plot::{Plot, Points, Value, Values};
+use wavetable::WavHandler;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
@@ -246,8 +250,31 @@ impl OwlWaveApp {
                         } else {
                             "???".to_owned()
                         };
+                        if let Some(path) = &file.path {
+                            if let Ok(open_file) = File::open(path) {
+                                if let Ok(wav_content) = WavHandler::read_content(open_file) {
+                                    if let Ok(num_tables) = self.grid.load_waves(&wav_content) {
+                                        info += &format!(" {} tables", num_tables);
+                                    } else {
+                                        info += "\nno tables read";
+                                    }
+                                }
+                            }
+                        }
                         if let Some(bytes) = &file.bytes {
                             info += &format!(" ({} bytes)", bytes.len());
+                            let reader = Cursor::new(bytes);
+                            if let Ok(wav_content) = WavHandler::read_content(reader) {
+                                if let Ok(num_tables) = self.grid.load_waves(&wav_content) {
+                                    info += &format!(" {} tables", num_tables);
+                                } else {
+                                    info += "\nno tables read";
+                                }
+                            } else {
+                                info += "\nno content";
+                            }
+                        } else {
+                            info += "\nno bytes";
                         }
                         ui.label(info);
                     }
