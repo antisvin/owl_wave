@@ -2,7 +2,13 @@ use std::fs::File;
 use std::io::Cursor;
 
 use crate::grid::Grid;
-use eframe::{egui, epi};
+use eframe::{
+    egui::{
+        self,
+        plot::{Bar, BarChart},
+    },
+    epi,
+};
 use egui::plot::{Plot, Points, Value, Values};
 use wavetable::WavHandler;
 
@@ -106,7 +112,6 @@ impl epi::App for OwlWaveApp {
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             ui.heading("Wavetables");
 
-            //egui::Grid::new("tables list").show(ui,|ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 for i in 0..self.grid.get_waves() {
                     //ui.label(i.to_string());
@@ -132,15 +137,8 @@ impl epi::App for OwlWaveApp {
                     if response.clicked() {
                         self.active_wave_id = i
                     }
-                    //ui.add(plot);
-                    //ui.end_row();
                 }
             });
-
-            //ui.add(egui::Slider::new(value, 0.0..=10.0).text("value"));
-            //if ui.button("Increment").clicked() {
-            //    *value += 1.0;
-            //}
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 ui.horizontal(|ui| {
@@ -154,8 +152,6 @@ impl epi::App for OwlWaveApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // The central panel the region left after adding TopPanel's and SidePanel's
-
             ui.heading("OWL wave");
             ui.hyperlink("https://github.com/antisvin/owl_wave");
             ui.add(egui::github_link_file!(
@@ -166,27 +162,44 @@ impl epi::App for OwlWaveApp {
         });
 
         egui::Window::new("Wavetable").show(ctx, |ui| {
-            let samples = self.grid.get_samples() as f64;
-            let points = Points::new(Values::from_values(
-                self.grid
-                    .get_wave_by_id(self.active_wave_id)
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &v)| Value::new(i as f64 / samples, v))
-                    .collect(),
-            ))
-            .stems(-1.5)
-            .radius(1.0);
-            //ui.points(points.name("Points with stems"));
-            let plot = Plot::new("Points")
-                .view_aspect(1.0)
-                .allow_drag(false)
-                .show_axes([false, true]);
-            //ui.add(plot);
-            let _response = plot.show(ui, |plot_ui| plot_ui.points(points)).response;
-            //if response.clicked() {
-            //    self.active_wave_id = i
-            //}
+            ui.vertical(|ui| {
+                let samples = self.grid.get_samples();
+                let points = Points::new(Values::from_values(
+                    self.grid
+                        .get_wave_by_id(self.active_wave_id)
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &v)| Value::new(i as f64 / samples as f64, v))
+                        .collect(),
+                ))
+                .stems(-1.5)
+                .radius(1.0);
+                //ui.points(points.name("Points with stems"));
+                let plot = Plot::new("Points")
+                    .view_aspect(1.0)
+                    .allow_drag(false)
+                    .show_axes([false, true]);
+                plot.show(ui, |plot_ui| plot_ui.points(points));
+
+                // Harmonics
+                let harmonics = BarChart::new(
+                    self.grid
+                        .get_harmonics(self.active_wave_id)
+                        .iter()
+                        .take(samples / 2)
+                        .enumerate()
+                        .map(|(i, &v)| {
+                            Bar::new(i as f64 / samples as f64, v.to_polar().0)
+                                .width(1.0 / samples as f64)
+                        })
+                        .collect(),
+                );
+                let harm_plot = Plot::new("Harmonics")
+                    .view_aspect(4.0)
+                    .allow_drag(false)
+                    .show_axes([false, true]);
+                harm_plot.show(ui, |plot_ui| plot_ui.bar_chart(harmonics));
+            })
         });
         egui::Window::new("Grid").show(ctx, |ui| {
             //ui.label("Wavetables grid");
