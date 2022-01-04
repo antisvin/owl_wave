@@ -57,7 +57,6 @@ impl Grid {
     }
     pub fn load_waves(&mut self, wav_data: &WavData) -> Result<usize, ()> {
         let result = WtReader::create_wavetable(wav_data, None);
-        //let result = WtReader::create_wavetable(wav_data, Some(self.samples));
         if let Ok(wt_ref) = result {
             let num_tables = min(self.get_waves(), wt_ref.num_samples / self.samples);
             let mut new_wave = wt_ref.get_wave(0).iter();
@@ -69,12 +68,6 @@ impl Grid {
                 for s in wave.iter_mut() {
                     *s = *new_wave.next().unwrap_or(&0.0);
                 }
-                //for &mut sample in wave.iter_mut().take(self.samples) {
-                //    sample = new_wave.next().unwrap();
-                //}
-
-                //wave.clear();
-                // = wt_ref.get_wave(i);
             }
             for i in num_tables..self.get_waves() {
                 self.wavetable.get_wave_mut(i).clear()

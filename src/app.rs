@@ -87,12 +87,10 @@ impl epi::App for OwlWaveApp {
                         #[cfg(not(target_arch = "wasm32"))]
                         if ui.button("Open").clicked() {
                             if let Some(path) = rfd::FileDialog::new().pick_file() {
-                                let picked_path = Some(path.display().to_string());
-                                if let Some(picked_path) = picked_path {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Picked file:");
-                                        ui.monospace(picked_path);
-                                    });
+                                if let Ok(open_file) = File::open(path) {
+                                    if let Ok(wav_content) = WavHandler::read_content(open_file) {
+                                        self.grid.load_waves(&wav_content).unwrap_or(0);
+                                    }
                                 }
                             }
                         }
@@ -260,8 +258,7 @@ impl OwlWaveApp {
                                     }
                                 }
                             }
-                        }
-                        if let Some(bytes) = &file.bytes {
+                        } else if let Some(bytes) = &file.bytes {
                             info += &format!(" ({} bytes)", bytes.len());
                             let reader = Cursor::new(bytes);
                             if let Ok(wav_content) = WavHandler::read_content(reader) {
