@@ -156,7 +156,7 @@ impl epi::App for OwlWaveApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
-            ui.heading("eframe template");
+            ui.heading("OWL wave");
             ui.hyperlink("https://github.com/antisvin/owl_wave");
             ui.add(egui::github_link_file!(
                 "https://github.com/antisvin/owl_wave/blob/master/",
@@ -189,7 +189,38 @@ impl epi::App for OwlWaveApp {
             //}
         });
         egui::Window::new("Grid").show(ctx, |ui| {
-            ui.label("Wavetables grid");
+            //ui.label("Wavetables grid");
+            egui::Grid::new("grid").show(ui, |ui| {
+                let samples = self.grid.get_samples() as f64;
+                let mut wave_id = 0;
+                for _i in 0..self.grid.get_rows() {
+                    for _j in 0..self.grid.get_cols() {
+                        let points = Points::new(Values::from_values(
+                            self.grid
+                                .get_wave_by_id(wave_id)
+                                .iter()
+                                .enumerate()
+                                .map(|(i, &v)| Value::new(i as f64 / samples, v))
+                                .collect(),
+                        ))
+                        .stems(-1.5)
+                        .radius(1.0);
+                        //ui.points(points.name("Points with stems"));
+                        let plot = Plot::new("Points")
+                            .view_aspect(1.0)
+                            .allow_drag(false)
+                            .show_axes([false, true]);
+                        //ui.add(plot);
+                        let plot = plot.show_background(self.active_wave_id == wave_id);
+                        let response = plot.show(ui, |plot_ui| plot_ui.points(points)).response;
+                        if response.clicked() {
+                            self.active_wave_id = wave_id;
+                        }
+                        wave_id += 1;
+                    }
+                    ui.end_row()
+                }
+            });
         });
 
         //self.backend_panel.end_of_frame(ctx);
@@ -236,49 +267,29 @@ impl OwlWaveApp {
 
         // Show dropped files (if any):
         if !self.dropped_files.is_empty() {
-            let mut open = true;
-            egui::Window::new("Dropped files")
-                .open(&mut open)
-                .show(ctx, |ui| {
-                    for file in &self.dropped_files {
-                        let mut info = if let Some(path) = &file.path {
-                            path.display().to_string()
-                        } else if !file.name.is_empty() {
-                            file.name.clone()
-                        } else {
-                            "???".to_owned()
-                        };
-                        if let Some(path) = &file.path {
-                            if let Ok(open_file) = File::open(path) {
-                                if let Ok(wav_content) = WavHandler::read_content(open_file) {
-                                    if let Ok(num_tables) = self.grid.load_waves(&wav_content) {
-                                        info += &format!(" {} tables", num_tables);
-                                    } else {
-                                        info += "\nno tables read";
-                                    }
-                                }
-                            }
-                        } else if let Some(bytes) = &file.bytes {
-                            info += &format!(" ({} bytes)", bytes.len());
-                            let reader = Cursor::new(bytes);
-                            if let Ok(wav_content) = WavHandler::read_content(reader) {
-                                if let Ok(num_tables) = self.grid.load_waves(&wav_content) {
-                                    info += &format!(" {} tables", num_tables);
-                                } else {
-                                    info += "\nno tables read";
-                                }
-                            } else {
-                                info += "\nno content";
-                            }
-                        } else {
-                            info += "\nno bytes";
+            for file in &self.dropped_files {
+                let mut info = if let Some(path) = &file.path {
+                    path.display().to_string()
+                } else if !file.name.is_empty() {
+                    file.name.clone()
+                } else {
+                    "???".to_owned()
+                };
+                if let Some(path) = &file.path {
+                    if let Ok(open_file) = File::open(path) {
+                        if let Ok(wav_content) = WavHandler::read_content(open_file) {
+                            self.grid.load_waves(&wav_content).unwrap_or(0);
                         }
-                        ui.label(info);
                     }
-                });
-            if !open {
-                self.dropped_files.clear();
+                } else if let Some(bytes) = &file.bytes {
+                    info += &format!(" ({} bytes)", bytes.len());
+                    let reader = Cursor::new(bytes);
+                    if let Ok(wav_content) = WavHandler::read_content(reader) {
+                        self.grid.load_waves(&wav_content).unwrap_or(0);
+                    }
+                }
             }
+            self.dropped_files.clear();
         }
     }
 }

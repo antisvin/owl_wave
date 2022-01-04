@@ -25,14 +25,6 @@ impl Grid {
         }
         grid
     }
-    /*
-    pub fn get_rows(&self) -> usize{
-        self.rows
-    }
-    pub fn get_cols(&self)-> usize {
-        self.cols
-    }
-     */
     pub fn get_waves(&self) -> usize {
         self.rows * self.cols
     }
@@ -40,6 +32,8 @@ impl Grid {
     pub fn get_wave(&self, row: usize, col: usize) -> &Vec<f64>{
         self.wavetable.get_wave(row * self.cols + col)
     }
+    */
+    /*
     pub fn get_wave_mut(&mut self, row: usize, col: usize) -> &mut Vec<f64>{
         self.wavetable.get_wave_mut(row * self.cols + col)
     }
@@ -54,6 +48,12 @@ impl Grid {
     */
     pub fn get_samples(&self) -> usize {
         self.samples
+    }
+    pub fn get_rows(&self) -> usize {
+        self.rows
+    }
+    pub fn get_cols(&self) -> usize {
+        self.cols
     }
     pub fn load_waves(&mut self, wav_data: &WavData) -> Result<usize, ()> {
         let result = WtReader::create_wavetable(wav_data, None);
