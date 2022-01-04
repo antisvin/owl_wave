@@ -86,6 +86,7 @@ impl epi::App for OwlWaveApp {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
+                egui::widgets::global_dark_light_mode_switch(ui);
                 ui.menu_button("File", |ui| {
                     if !frame.is_web() {
                         //ui.output().open_url(format!("#{}", anchor));
