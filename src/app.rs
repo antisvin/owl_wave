@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::Cursor;
 
-use crate::grid::Grid;
+use crate::{grid::Grid, midi_devices::MidiDeviceSelection};
 use eframe::{
     egui::{
         self,
@@ -10,6 +10,7 @@ use eframe::{
     epi,
 };
 use egui::plot::{Plot, Points, Value, Values};
+use midir::{Ignore, MidiInput};
 use wavetable::WavHandler;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -19,8 +20,11 @@ pub struct OwlWaveApp {
     // Example stuff:
     label: String,
     active_wave_id: usize,
+    midi_devices: MidiDeviceSelection,
+    midi_in_port: usize,
 
-    // this how you opt-out of serialization of a member
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    show_about: bool,
     #[cfg_attr(feature = "persistence", serde(skip))]
     grid: Grid,
     #[cfg_attr(feature = "serde", serde(skip))]
@@ -35,6 +39,9 @@ impl Default for OwlWaveApp {
             // Example stuff:
             label: format!("Owl Wave {}", VERSION),
             active_wave_id: 0,
+            midi_devices: MidiDeviceSelection::Owl,
+            midi_in_port: 0,
+            show_about: false,
             grid: Grid::new(8, 8, 256),
             dropped_files: Vec::<egui::DroppedFile>::new(),
         }
@@ -78,19 +85,12 @@ impl epi::App for OwlWaveApp {
     fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
         //let Self { label, grid } = self;
 
-        // Examples of how to create different panels and windows.
-        // Pick whichever suits you.
-        // Tip: a good default choice is to just keep the `CentralPanel`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
-
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
                 egui::widgets::global_dark_light_mode_switch(ui);
                 ui.menu_button("File", |ui| {
                     if !frame.is_web() {
-                        //ui.output().open_url(format!("#{}", anchor));
-                        //ui.button(tex)
                         #[cfg(not(target_arch = "wasm32"))]
                         if ui.button("Open").clicked() {
                             if let Some(path) = rfd::FileDialog::new().pick_file() {
@@ -107,8 +107,18 @@ impl epi::App for OwlWaveApp {
                         frame.quit();
                     }
                 });
+                ui.menu_button("Help", |ui| {
+                    if ui.button("About").clicked() {
+                        self.show_about = true;
+                    };
+                });
             });
         });
+        egui::Window::new("about")
+            .open(&mut self.show_about)
+            .show(ctx, |ui| {
+                ui.label(format!("Version: {}", VERSION));
+            });
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             ui.heading("Wavetables");
@@ -237,7 +247,26 @@ impl epi::App for OwlWaveApp {
             });
         });
 
-        //self.backend_panel.end_of_frame(ctx);
+        egui::Window::new("Devices").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.selectable_value(&mut self.midi_devices, MidiDeviceSelection::All, "All");
+                ui.selectable_value(&mut self.midi_devices, MidiDeviceSelection::Owl, "OWL");
+            });
+            ui.separator();
+            if let Ok(mut midi_in) = MidiInput::new("OWL wave") {
+                midi_in.ignore(Ignore::None);
+
+                ui.vertical(|ui| {
+                    for (i, p) in midi_in.ports().iter_mut().enumerate() {
+                        if let Ok(port_name) = midi_in.port_name(p) {
+                            if self.midi_devices.show_midi_device(&port_name) {
+                                ui.radio_value(&mut self.midi_in_port, i, port_name);
+                            }
+                        }
+                    }
+                });
+            }
+        });
 
         self.ui_file_drag_and_drop(ctx);
     }
