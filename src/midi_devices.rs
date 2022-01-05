@@ -1,4 +1,5 @@
 #[derive(PartialEq, Eq)]
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 pub enum MidiDeviceSelection {
     All,
     Owl,
