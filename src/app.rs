@@ -1,7 +1,10 @@
 use std::fs::File;
 use std::io::Cursor;
 
-use crate::{grid::Grid, midi_devices::MidiDeviceSelection};
+use crate::{
+    grid::Grid,
+    midi_devices::{MidiDeviceSelection, MidiInputHandle, MidiOutputHandle},
+};
 use eframe::{
     egui::{
         self,
@@ -10,19 +13,22 @@ use eframe::{
     epi,
 };
 use egui::plot::{Plot, Points, Value, Values};
-use midir::{Ignore, MidiInput};
 use wavetable::WavHandler;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
 pub struct OwlWaveApp {
-    // Example stuff:
     label: String,
     active_wave_id: usize,
-    midi_devices: MidiDeviceSelection,
-    midi_in_port: usize,
 
+    midi_devices: MidiDeviceSelection,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    midi_input: MidiInputHandle,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    midi_output: MidiOutputHandle,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    midi_loaded: bool,
     #[cfg_attr(feature = "persistence", serde(skip))]
     show_about: bool,
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -40,7 +46,10 @@ impl Default for OwlWaveApp {
             label: format!("Owl Wave {}", VERSION),
             active_wave_id: 0,
             midi_devices: MidiDeviceSelection::Owl,
-            midi_in_port: 0,
+            //midi_in_ports: Arc::new(MidiInputPorts::new()),
+            midi_input: MidiInputHandle::new("OWL wave"),
+            midi_output: MidiOutputHandle::new("OWL wave"),
+            midi_loaded: false,
             show_about: false,
             grid: Grid::new(8, 8, 256),
             dropped_files: Vec::<egui::DroppedFile>::new(),
@@ -249,23 +258,49 @@ impl epi::App for OwlWaveApp {
 
         egui::Window::new("Devices").show(ctx, |ui| {
             ui.horizontal(|ui| {
+                if ui.button("🔃").clicked() {
+                    self.reset_midi();
+                }
                 ui.selectable_value(&mut self.midi_devices, MidiDeviceSelection::All, "All");
                 ui.selectable_value(&mut self.midi_devices, MidiDeviceSelection::Owl, "OWL");
             });
             ui.separator();
-            if let Ok(mut midi_in) = MidiInput::new("OWL wave") {
-                midi_in.ignore(Ignore::None);
+            if !self.midi_loaded {
+                self.midi_input.reload();
+                self.midi_output.reload();
+                self.midi_loaded = true;
+            }
 
-                ui.vertical(|ui| {
-                    for (i, p) in midi_in.ports().iter_mut().enumerate() {
-                        if let Ok(port_name) = midi_in.port_name(p) {
-                            if self.midi_devices.show_midi_device(&port_name) {
-                                ui.radio_value(&mut self.midi_in_port, i, port_name);
+            ui.vertical(|ui| {
+                egui::Grid::new("grid").show(ui, |ui| {
+                    let mut selected_input_port = *self.midi_input.get_selected_port_mut();
+                    let mut selected_output_port = *self.midi_output.get_selected_port_mut();
+                    for ((i, in_port_name), (j, out_port_name)) in self
+                        .midi_input
+                        .names
+                        .iter()
+                        .enumerate()
+                        .zip(self.midi_output.names.iter().enumerate())
+                    {
+                        let show_in = self.midi_devices.show_midi_device(in_port_name);
+                        let show_out = self.midi_devices.show_midi_device(out_port_name);
+                        if show_in {
+                            ui.radio_value(&mut selected_input_port, i, in_port_name);
+                            if show_out {
+                                ui.radio_value(&mut selected_output_port, j, out_port_name);
                             }
+                        } else if show_out {
+                            ui.label("");
+                            ui.radio_value(&mut selected_output_port, j, out_port_name);
+                        }
+                        if show_in || show_out {
+                            ui.end_row();
                         }
                     }
+                    self.midi_input.selected_port = selected_input_port;
+                    self.midi_output.selected_port = selected_output_port;
                 });
-            }
+            });
         });
 
         self.ui_file_drag_and_drop(ctx);
@@ -334,5 +369,9 @@ impl OwlWaveApp {
             }
             self.dropped_files.clear();
         }
+    }
+    fn reset_midi(&mut self) -> &mut Self {
+        self.midi_loaded = false;
+        self
     }
 }
