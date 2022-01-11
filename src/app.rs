@@ -1,6 +1,8 @@
-use std::fs::File;
 use std::io::Cursor;
+use std::sync::Mutex;
+use std::{fs::File, sync::Arc};
 
+//use crate::midi_handler::handle_message;
 use crate::{
     grid::Grid,
     midi_devices::{MidiDeviceSelection, MidiInputHandle, MidiOutputHandle},
@@ -13,7 +15,17 @@ use eframe::{
     epi,
 };
 use egui::plot::{Plot, Points, Value, Values};
+//use once_cell::sync::Lazy;
 use wavetable::WavHandler;
+use wmidi::MidiMessage;
+/*
+lazy_static! {
+    static ref MIDI_HANDLER: Mutex<RefCell<Option<MidiHandler<'static>>>> =
+        Mutex::new(RefCell::new(None));
+} */
+
+//static MIDI_HANDLER: SyncLazy<Mutex<RefCell<Option<MidiHandler<'static>>>>> =
+//    SyncLazy::new(|| Mutex::new(RefCell::new(Some(MidiHandler::new()))));
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
@@ -21,10 +33,13 @@ use wavetable::WavHandler;
 pub struct OwlWaveApp {
     label: String,
     active_wave_id: usize,
+    midi_log: Arc<Mutex<Vec<u8>>>,
 
     midi_devices: MidiDeviceSelection,
     #[cfg_attr(feature = "persistence", serde(skip))]
-    midi_input: MidiInputHandle,
+    midi_input: MidiInputHandle<Arc<Mutex<Vec<u8>>>>,
+    //#[cfg_attr(feature = "persistence", serde(skip))]
+    //midi_handler: MidiHandler<'a>,
     #[cfg_attr(feature = "persistence", serde(skip))]
     midi_output: MidiOutputHandle,
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -33,6 +48,8 @@ pub struct OwlWaveApp {
     show_about: bool,
     #[cfg_attr(feature = "persistence", serde(skip))]
     grid: Grid,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    log: String,
     #[cfg_attr(feature = "serde", serde(skip))]
     dropped_files: Vec<egui::DroppedFile>,
 }
@@ -41,17 +58,38 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 impl Default for OwlWaveApp {
     fn default() -> Self {
+        /*
+        MIDI_HANDLER
+            .lock()
+            .unwrap()
+            .replace(Some(MidiHandler::new()));
+             */
+        //let midi_handler = MidiHandler::new();
+        let midi_log = Arc::new(Mutex::new(Vec::new()));
+        let midi_input = MidiInputHandle::new(
+            "OWL wave",
+            0,
+            |stamp, message, log| {
+                println!("{}: {:?} (len = {})", stamp, message, message.len());
+                log.lock().unwrap().extend_from_slice(message)
+                //log.extend_from_slice(message);
+            },
+            //move |timestamp, data, _| midi_handler.handle_message(timestamp, data),
+            midi_log.clone(),
+        );
         Self {
-            // Example stuff:
-            label: format!("Owl Wave {}", VERSION),
+            label: format!("OWL Wave {}", VERSION),
             active_wave_id: 0,
+            midi_log,
+            //midi_handler,
             midi_devices: MidiDeviceSelection::Owl,
             //midi_in_ports: Arc::new(MidiInputPorts::new()),
-            midi_input: MidiInputHandle::new("OWL wave"),
-            midi_output: MidiOutputHandle::new("OWL wave"),
+            midi_input,
+            midi_output: MidiOutputHandle::new("OWL Wave", 0),
             midi_loaded: false,
             show_about: false,
             grid: Grid::new(8, 8, 256),
+            log: String::new(),
             dropped_files: Vec::<egui::DroppedFile>::new(),
         }
     }
@@ -159,16 +197,6 @@ impl epi::App for OwlWaveApp {
                     }
                 }
             });
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    ui.label("powered by ");
-                    ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-                    ui.label(" and ");
-                    ui.hyperlink_to("eframe", "https://github.com/emilk/egui/tree/master/eframe");
-                });
-            });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -257,21 +285,38 @@ impl epi::App for OwlWaveApp {
         });
 
         egui::Window::new("Devices").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                if ui.button("🔃").clicked() {
-                    self.reset_midi();
-                }
-                ui.selectable_value(&mut self.midi_devices, MidiDeviceSelection::All, "All");
-                ui.selectable_value(&mut self.midi_devices, MidiDeviceSelection::Owl, "OWL");
-            });
-            ui.separator();
-            if !self.midi_loaded {
-                self.midi_input.reload();
-                self.midi_output.reload();
-                self.midi_loaded = true;
-            }
-
             ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    if ui.button("🔃").clicked() {
+                        self.reset_midi();
+                    }
+                    ui.selectable_value(&mut self.midi_devices, MidiDeviceSelection::All, "All");
+                    ui.selectable_value(&mut self.midi_devices, MidiDeviceSelection::Owl, "OWL");
+                });
+                ui.separator();
+
+                if !self.midi_loaded {
+                    /*
+                    self.midi_input = MidiInputHandle::new(
+                        "OWL wave",
+                        0,
+                        move |timestamp, data, _| {
+                            MIDI_HANDLER
+                                .lock()
+                                .unwrap()
+                                .take()
+                                //.as_ref()
+                                .unwrap()
+                                .handle_message(timestamp, data)
+                        },
+                        (),
+                    );
+                    */
+                    self.midi_output =
+                        MidiOutputHandle::new("OWL-out", self.midi_output.selected_port);
+                    self.midi_loaded = true;
+                }
+
                 egui::Grid::new("grid").show(ui, |ui| {
                     let mut selected_input_port = *self.midi_input.get_selected_port_mut();
                     let mut selected_output_port = *self.midi_output.get_selected_port_mut();
@@ -300,6 +345,40 @@ impl epi::App for OwlWaveApp {
                     self.midi_input.selected_port = selected_input_port;
                     self.midi_output.selected_port = selected_output_port;
                 });
+
+                ui.horizontal(|ui| {
+                    if ui.button("Info").clicked() {
+                        self.midi_output.request_owl_info().unwrap();
+                    }
+                });
+                if self.midi_devices == MidiDeviceSelection::Owl {
+                    if let Ok(mut data_guard) = self.midi_log.lock() {
+                        //data_guard.iter(|| wmidi::MidiMessage::try_from().unwrap());
+                        let bytes = data_guard.as_mut_slice();
+                        let mut start = 0;
+                        while start < bytes.len() {
+                            let message = wmidi::MidiMessage::try_from(&bytes[start..]).unwrap();
+                            start += message.bytes_size();
+                            if let MidiMessage::SysEx(_data) = message {
+                                let mut buf: [u8; 256] = [0; 256];
+                                if let Ok(size) = message.copy_to_slice(buf.as_mut_slice()) {
+                                    for byte in buf.iter().take(size) {
+                                        self.log += format!("{:x?}", byte).as_str();
+                                    }
+                                }
+                            }
+                        }
+                        data_guard.clear();
+                        //data_guard.
+
+                        //for byte in data_guard.iter_mut() {
+                        //    if let MidiMessage::SysEx(bytes) = MidiMessage::try_from(byte) {}
+                        //}
+
+                        //midi_handler.messages.pop() {
+                    }
+                    ui.label(self.log.clone());
+                }
             });
         });
 

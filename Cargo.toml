@@ -1,6 +1,6 @@
 [package]
 name = "owl_wave"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Stas Shtin <antisvin@gmail.com>"]
 edition = "2021"
 rust-version = "1.56"
@@ -19,8 +19,14 @@ wavetable = { git = "https://github.com/icsga/Wavetable.git", version = "0.2.0",
 #basic_dsp = "0.9.4"
 rustfft = "5.0.0"
 rfd = "0.6.3"
-owl_midi = "0.1.0"
+owl_midi = "0.2.0"
 midir = "0.7.0"
+wmidi = "4.0.6"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = "0.3.55"
+js-sys = "0.3"
+console_error_panic_hook = "0.1.7"
 
 [features]
 default = []

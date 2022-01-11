@@ -340,6 +340,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if 1.0.0",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "copypasta"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1459,24 +1469,28 @@ dependencies = [
 
 [[package]]
 name = "owl_midi"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82902956ad541c45258ec099db602e52827cced65509ed158b914e0f23686e47"
+checksum = "9fcebdfb690ac7ade9c094a635c70982271581ae1b91feeead076941a2144adf"
 dependencies = [
  "bindgen",
 ]
 
 [[package]]
 name = "owl_wave"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
+ "console_error_panic_hook",
  "eframe",
+ "js-sys",
  "midir",
  "owl_midi",
  "rfd",
  "rustfft",
  "serde",
  "wavetable",
+ "web-sys",
+ "wmidi",
 ]
 
 [[package]]
@@ -2301,6 +2315,12 @@ dependencies = [
  "winapi",
  "x11-dl",
 ]
+
+[[package]]
+name = "wmidi"
+version = "4.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b7ff057a07cdcca1dce95859fb6e205dc99a9bc526d72f3d724468a12aa74a5"
 
 [[package]]
 name = "x11-clipboard"
