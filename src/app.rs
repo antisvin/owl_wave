@@ -341,7 +341,7 @@ impl epi::App for OwlWaveApp {
                             self.owl_command_processor
                                 .request_settings(
                                     connection,
-                                    OpenWareMidiSysexCommand::SYSEX_RESOURCE_NAME_COMMAND,
+                                    OpenWareMidiSysexCommand::SYSEX_FIRMWARE_VERSION,
                                 )
                                 .unwrap();
                         }
@@ -358,9 +358,20 @@ impl epi::App for OwlWaveApp {
                             if let MidiMessage::SysEx(_data) = message {
                                 let mut buf: [u8; 256] = [0; 256];
                                 if let Ok(size) = message.copy_to_slice(buf.as_mut_slice()) {
-                                    for byte in buf.iter().take(size) {
-                                        self.log += format!("{:x?}", byte).as_str();
+                                    if size > 0 {
+                                        if let Ok(_result) =
+                                            self.owl_command_processor.handle_response(&buf, size)
+                                        {
+                                            self.log += format!(
+                                                "{}\n",
+                                                self.owl_command_processor.output.as_ref().unwrap()
+                                            )
+                                            .as_str()
+                                        }
                                     }
+                                    //for byte in buf.iter().take(size) {
+                                    //    self.log += format!("{:x?}", byte).as_str();
+                                    //}
                                 }
                             }
                         }

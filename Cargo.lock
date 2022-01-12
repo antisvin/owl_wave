@@ -1478,7 +1478,7 @@ dependencies = [
 
 [[package]]
 name = "owl_wave"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "console_error_panic_hook",
  "eframe",
