@@ -58,13 +58,6 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 impl Default for OwlWaveApp {
     fn default() -> Self {
-        /*
-        MIDI_HANDLER
-            .lock()
-            .unwrap()
-            .replace(Some(MidiHandler::new()));
-             */
-        //let midi_handler = MidiHandler::new();
         let midi_log = Arc::new(Mutex::new(Vec::new()));
         let midi_input = MidiInputHandle::new(
             "OWL wave",
@@ -284,6 +277,7 @@ impl epi::App for OwlWaveApp {
             });
         });
 
+        // MIDI devices window
         egui::Window::new("Devices").show(ctx, |ui| {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
@@ -296,24 +290,9 @@ impl epi::App for OwlWaveApp {
                 ui.separator();
 
                 if !self.midi_loaded {
-                    /*
-                    self.midi_input = MidiInputHandle::new(
-                        "OWL wave",
-                        0,
-                        move |timestamp, data, _| {
-                            MIDI_HANDLER
-                                .lock()
-                                .unwrap()
-                                .take()
-                                //.as_ref()
-                                .unwrap()
-                                .handle_message(timestamp, data)
-                        },
-                        (),
-                    );
-                    */
-                    self.midi_output =
-                        MidiOutputHandle::new("OWL-out", self.midi_output.selected_port);
+                    // Reconnect
+                    self.update_midi_input();
+                    self.update_midi_output();
                     self.midi_loaded = true;
                 }
 
@@ -342,8 +321,16 @@ impl epi::App for OwlWaveApp {
                             ui.end_row();
                         }
                     }
-                    self.midi_input.selected_port = selected_input_port;
-                    self.midi_output.selected_port = selected_output_port;
+                    if selected_input_port != self.midi_input.selected_port {
+                        // Connect to a different input
+                        self.midi_input.selected_port = selected_input_port;
+                        self.update_midi_input()
+                    }
+                    if selected_output_port != self.midi_output.selected_port {
+                        // Connect to a different output
+                        self.midi_output.selected_port = selected_output_port;
+                        self.update_midi_output()
+                    }
                 });
 
                 ui.horizontal(|ui| {
@@ -452,5 +439,19 @@ impl OwlWaveApp {
     fn reset_midi(&mut self) -> &mut Self {
         self.midi_loaded = false;
         self
+    }
+    fn update_midi_input(&mut self) {
+        self.midi_input = MidiInputHandle::new(
+            "OWL wave",
+            self.midi_input.selected_port,
+            |stamp, message, log| {
+                println!("{}: {:x?} (len = {})", stamp, message, message.len());
+                log.lock().unwrap().extend_from_slice(message)
+            },
+            self.midi_log.clone(),
+        );
+    }
+    fn update_midi_output(&mut self) {
+        self.midi_output = MidiOutputHandle::new("OWL wave", self.midi_output.selected_port);
     }
 }
