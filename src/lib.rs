@@ -5,6 +5,7 @@
 mod app;
 mod grid;
 mod midi_devices;
+mod owl_control;
 mod wave;
 //mod effects;
 pub use app::OwlWaveApp;

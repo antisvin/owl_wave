@@ -2,6 +2,7 @@ use std::io::Cursor;
 use std::sync::Mutex;
 use std::{fs::File, sync::Arc};
 
+use crate::owl_control::OwlCommandProcessor;
 //use crate::midi_handler::handle_message;
 use crate::{
     grid::Grid,
@@ -15,6 +16,7 @@ use eframe::{
     epi,
 };
 use egui::plot::{Plot, Points, Value, Values};
+use owl_midi::OpenWareMidiSysexCommand;
 //use once_cell::sync::Lazy;
 use wavetable::WavHandler;
 use wmidi::MidiMessage;
@@ -38,8 +40,8 @@ pub struct OwlWaveApp {
     midi_devices: MidiDeviceSelection,
     #[cfg_attr(feature = "persistence", serde(skip))]
     midi_input: MidiInputHandle<Arc<Mutex<Vec<u8>>>>,
-    //#[cfg_attr(feature = "persistence", serde(skip))]
-    //midi_handler: MidiHandler<'a>,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    owl_command_processor: OwlCommandProcessor,
     #[cfg_attr(feature = "persistence", serde(skip))]
     midi_output: MidiOutputHandle,
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -74,7 +76,7 @@ impl Default for OwlWaveApp {
             label: format!("OWL Wave {}", VERSION),
             active_wave_id: 0,
             midi_log,
-            //midi_handler,
+            owl_command_processor: OwlCommandProcessor::new(),
             midi_devices: MidiDeviceSelection::Owl,
             //midi_in_ports: Arc::new(MidiInputPorts::new()),
             midi_input,
@@ -335,7 +337,14 @@ impl epi::App for OwlWaveApp {
 
                 ui.horizontal(|ui| {
                     if ui.button("Info").clicked() {
-                        self.midi_output.request_owl_info().unwrap();
+                        if let Some(connection) = &mut self.midi_output.connection {
+                            self.owl_command_processor
+                                .request_settings(
+                                    connection,
+                                    OpenWareMidiSysexCommand::SYSEX_RESOURCE_NAME_COMMAND,
+                                )
+                                .unwrap();
+                        }
                     }
                 });
                 if self.midi_devices == MidiDeviceSelection::Owl {

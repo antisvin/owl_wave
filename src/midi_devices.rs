@@ -1,10 +1,7 @@
-use std::error::Error;
-
 use midir::{
     MidiInput, MidiInputConnection, MidiInputPorts, MidiOutput, MidiOutputConnection,
     MidiOutputPorts,
 };
-use wmidi::{Channel, ControlFunction, MidiMessage, U7};
 
 #[derive(PartialEq, Eq)]
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
@@ -64,7 +61,7 @@ impl<T> MidiInputHandle<T> {
 }
 
 pub struct MidiOutputHandle {
-    connection: Option<MidiOutputConnection>,
+    pub connection: Option<MidiOutputConnection>,
     pub ports: MidiOutputPorts,
     pub names: Vec<String>,
     pub selected_port: usize,
@@ -95,28 +92,5 @@ impl MidiOutputHandle {
     }
     pub fn get_selected_port_mut(&mut self) -> &mut usize {
         &mut self.selected_port
-    }
-    pub fn request_owl_info(&mut self) -> Result<(), Box<dyn Error>> {
-        let chan = Channel::from_index(0).unwrap();
-        let message = MidiMessage::ControlChange(
-            chan,
-            ControlFunction(
-                U7::try_from(owl_midi::OpenWareMidiControl::REQUEST_SETTINGS as u8).unwrap(),
-            ),
-            U7::try_from(owl_midi::OpenWareMidiSysexCommand::SYSEX_FIRMWARE_VERSION as u8).unwrap(),
-        );
-        let mut msg_data = [0u8; 3];
-        message.copy_to_slice(&mut msg_data).unwrap();
-        println!(
-            "MSG={:x?} {:x?} {:x?}",
-            msg_data[0], msg_data[1], msg_data[2]
-        );
-        if let Some(connection) = &mut self.connection {
-            connection
-                .send(&msg_data)
-                .unwrap_or_else(|_| println!("Error when forwarding message ..."));
-            println!("Message sent");
-        }
-        Ok(())
     }
 }
