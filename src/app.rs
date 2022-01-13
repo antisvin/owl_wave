@@ -8,6 +8,8 @@ use crate::{
     grid::Grid,
     midi_devices::{MidiDeviceSelection, MidiInputHandle, MidiOutputHandle},
 };
+use cpal::traits::{DeviceTrait, HostTrait};
+use cpal::HostId;
 use eframe::{
     egui::{
         self,
@@ -16,6 +18,7 @@ use eframe::{
     epi,
 };
 use egui::plot::{Plot, Points, Value, Values};
+use itertools::{EitherOrBoth::Both, EitherOrBoth::Left, EitherOrBoth::Right, Itertools};
 use owl_midi::OpenWareMidiSysexCommand;
 //use once_cell::sync::Lazy;
 use wavetable::WavHandler;
@@ -279,8 +282,39 @@ impl epi::App for OwlWaveApp {
             });
         });
 
+        egui::Window::new("Audio Devices").show(ctx, |ui| {
+            ui.vertical(|ui| {
+                let input_hosts = cpal::available_hosts();
+                let mut num_input_devices = 0;
+                for host_id in input_hosts {
+                    if let Ok(host) = cpal::host_from_id(host_id) {
+                        ui.label(host_id.name());
+                        let _default_in = host.default_input_device().map(|e| e.name().unwrap());
+                        let _default_out = host.default_output_device().map(|e| e.name().unwrap());
+                        let input_devices: Vec<(HostId, usize, String)> = host
+                            .input_devices()
+                            .map(|devices| {
+                                devices.enumerate().map(|(device_index, device)| {
+                                    (
+                                        host_id,
+                                        device_index + num_input_devices,
+                                        device.name().unwrap_or_else(|_| "-".to_string()),
+                                    )
+                                })
+                            })
+                            .unwrap()
+                            .collect();
+                        num_input_devices += input_devices.len();
+                        for (_host, _device_index, device_name) in input_devices.iter() {
+                            ui.label(device_name);
+                        }
+                    }
+                }
+            });
+        });
+
         // MIDI devices window
-        egui::Window::new("Devices").show(ctx, |ui| {
+        egui::Window::new("MIDI Devices").show(ctx, |ui| {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
                     if ui.button("🔃").clicked() {
@@ -301,26 +335,45 @@ impl epi::App for OwlWaveApp {
                 egui::Grid::new("grid").show(ui, |ui| {
                     let mut selected_input_port = *self.midi_input.get_selected_port_mut();
                     let mut selected_output_port = *self.midi_output.get_selected_port_mut();
-                    for ((i, in_port_name), (j, out_port_name)) in self
+                    for pair in self
                         .midi_input
                         .names
                         .iter()
                         .enumerate()
-                        .zip(self.midi_output.names.iter().enumerate())
+                        .zip_longest(self.midi_output.names.iter().enumerate())
                     {
-                        let show_in = self.midi_devices.show_midi_device(in_port_name);
-                        let show_out = self.midi_devices.show_midi_device(out_port_name);
-                        if show_in {
-                            ui.radio_value(&mut selected_input_port, i, in_port_name);
-                            if show_out {
-                                ui.radio_value(&mut selected_output_port, j, out_port_name);
+                        match pair {
+                            Both((i, in_port_name), (j, out_port_name)) => {
+                                let show_in = self.midi_devices.show_midi_device(in_port_name);
+                                let show_out = self.midi_devices.show_midi_device(out_port_name);
+                                if show_in || show_out {
+                                    if show_in {
+                                        ui.radio_value(&mut selected_input_port, i, in_port_name);
+                                    } else {
+                                        ui.label("");
+                                    }
+                                    if show_out {
+                                        ui.radio_value(&mut selected_output_port, j, out_port_name);
+                                    } else {
+                                        ui.label("");
+                                    }
+                                    ui.end_row()
+                                }
                             }
-                        } else if show_out {
-                            ui.label("");
-                            ui.radio_value(&mut selected_output_port, j, out_port_name);
-                        }
-                        if show_in || show_out {
-                            ui.end_row();
+                            Left((i, in_port_name)) => {
+                                if self.midi_devices.show_midi_device(in_port_name) {
+                                    ui.radio_value(&mut selected_input_port, i, in_port_name);
+                                    ui.label("");
+                                    ui.end_row();
+                                }
+                            }
+                            Right((j, out_port_name)) => {
+                                if self.midi_devices.show_midi_device(out_port_name) {
+                                    ui.label("");
+                                    ui.radio_value(&mut selected_output_port, j, out_port_name);
+                                    ui.end_row()
+                                }
+                            }
                         }
                     }
                     if selected_input_port != self.midi_input.selected_port {

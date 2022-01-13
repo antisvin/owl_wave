@@ -1,9 +1,9 @@
 [package]
 name = "owl_wave"
-version = "0.2.3"
+version = "0.3.0"
 authors = ["Stas Shtin <antisvin@gmail.com>"]
 edition = "2021"
-rust-version = "1.56"
+rust-version = "1.58"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -22,6 +22,8 @@ rfd = "0.6.3"
 owl_midi = "0.2.0"
 midir = "0.7.0"
 wmidi = "4.0.6"
+cpal = "0.13.4"
+itertools = "0.10.3"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = "0.3.55"
