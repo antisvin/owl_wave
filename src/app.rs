@@ -398,7 +398,8 @@ impl epi::App for OwlWaveApp {
                             if selected_audio_output != self.selected_audio_output {
                                 // Connect to a different input
                                 self.audio_handler
-                                    .select_output(self.selected_audio_host, selected_audio_output);
+                                    .select_output(self.selected_audio_host, selected_audio_output)
+                                    .unwrap();
                                 self.selected_audio_output = selected_audio_output
                             }
                         }

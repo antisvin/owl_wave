@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cpal::{
     traits::HostTrait,
     traits::{DeviceTrait, StreamTrait},
-    Device, Host, HostId, Sample, SampleFormat, Stream,
+    Device, Host, HostId, Stream,
 };
 
 pub struct AudioHandler {
@@ -64,10 +64,14 @@ impl AudioHandler {
         self.audio_loaded = true;
         self
     }
-    pub fn select_output(&mut self, maybe_host_id: Option<HostId>, maybe_device_id: Option<usize>) {
+    pub fn select_output(
+        &mut self,
+        maybe_host_id: Option<HostId>,
+        maybe_device_id: Option<usize>,
+    ) -> Result<(), anyhow::Error> {
         if let Some(host_id) = maybe_host_id {
             if let Some(device_id) = maybe_device_id {
-                let err_fn = |err| print!("an error occurred on the output audio stream: {}", err);
+                //let err_fn = |err| print!("an error occurred on the output audio stream: {}", err);
                 let device = self
                     .output_devices
                     .get(&host_id)
@@ -83,7 +87,8 @@ impl AudioHandler {
                     .with_max_sample_rate();
                 let sample_format = supported_config.sample_format();
                 let config = supported_config.into();
-                self.output_stream = match sample_format {
+                /*
+                let stream = match sample_format {
                     SampleFormat::F32 => {
                         device.build_output_stream(&config, write_silence::<f32>, err_fn)
                     }
@@ -93,11 +98,18 @@ impl AudioHandler {
                     SampleFormat::U16 => {
                         device.build_output_stream(&config, write_silence::<u16>, err_fn)
                     }
-                }
-                .ok();
-                if let Some(stream) = &self.output_stream {
-                    stream.play().unwrap()
-                }
+                };
+                self.output_stream = stream.ok();
+                //let stream = &self.output_stream;
+                self.output_stream.as_ref().unwrap().play()?;
+                 */
+
+                self.output_stream = match sample_format {
+                    cpal::SampleFormat::F32 => Some(run::<f32>(device, &config)),
+                    cpal::SampleFormat::I16 => Some(run::<i16>(device, &config)),
+                    cpal::SampleFormat::U16 => Some(run::<u16>(device, &config)),
+                };
+                self.output_stream.as_ref().unwrap().play()?;
                 /*
                 self.output_stream = device
                     .build_output_stream(
@@ -114,6 +126,7 @@ impl AudioHandler {
                      */
             }
         }
+        Ok(())
     }
 
     pub fn select_input(&mut self, _host_id: Option<HostId>, _device: Option<usize>) {}
@@ -131,12 +144,13 @@ where
     }
 }
  */
-
+/*
 fn write_silence<T: Sample>(data: &mut [T], _: &cpal::OutputCallbackInfo) {
     for sample in data.iter_mut() {
         *sample = Sample::from(&0.0);
     }
 }
+ */
 /*
 use cpal::traits::DeviceTrait;
 use cpal::{Sample, SampleFormat, Stream};
@@ -158,7 +172,7 @@ pub fn init_audio() -> Handle {
         cpal::SampleFormat::U16 => run::<u16>(&device, &config.into()),
     })
 }
-
+*/
 fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig) -> Stream
 where
     T: cpal::Sample,
@@ -197,4 +211,3 @@ where
         }
     }
 }
-*/

@@ -23,6 +23,7 @@ owl_midi = "0.2.2"
 midir = "0.7.0"
 wmidi = "4.0.6"
 itertools = "0.10.3"
+anyhow = "1.0.12"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 cpal = { version = "0.13.5" }
