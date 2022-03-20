@@ -1,14 +1,10 @@
-use std::io::Cursor;
-use std::sync::Mutex;
-use std::{fs::File, sync::Arc};
-
+use crate::audio_devices::AudioHandler;
 use crate::owl_control::OwlCommandProcessor;
-//use crate::midi_handler::handle_message;
 use crate::{
     grid::Grid,
     midi_devices::{MidiDeviceSelection, MidiInputHandle, MidiOutputHandle},
 };
-use cpal::traits::{DeviceTrait, HostTrait};
+use cpal::traits::DeviceTrait;
 use cpal::HostId;
 use eframe::{
     egui::{
@@ -20,17 +16,11 @@ use eframe::{
 use egui::plot::{Plot, Points, Value, Values};
 use itertools::{EitherOrBoth::Both, EitherOrBoth::Left, EitherOrBoth::Right, Itertools};
 use owl_midi::OpenWareMidiSysexCommand;
-//use once_cell::sync::Lazy;
+use std::io::Cursor;
+use std::sync::Mutex;
+use std::{fs::File, sync::Arc};
 use wavetable::WavHandler;
 use wmidi::MidiMessage;
-/*
-lazy_static! {
-    static ref MIDI_HANDLER: Mutex<RefCell<Option<MidiHandler<'static>>>> =
-        Mutex::new(RefCell::new(None));
-} */
-
-//static MIDI_HANDLER: SyncLazy<Mutex<RefCell<Option<MidiHandler<'static>>>>> =
-//    SyncLazy::new(|| Mutex::new(RefCell::new(Some(MidiHandler::new()))));
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
@@ -38,6 +28,7 @@ lazy_static! {
 pub struct OwlWaveApp {
     label: String,
     active_wave_id: usize,
+
     midi_log: Arc<Mutex<Vec<u8>>>,
 
     midi_devices: MidiDeviceSelection,
@@ -57,6 +48,12 @@ pub struct OwlWaveApp {
     log: String,
     #[cfg_attr(feature = "serde", serde(skip))]
     dropped_files: Vec<egui::DroppedFile>,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    audio_handler: AudioHandler,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    selected_audio_host: Option<HostId>,
+    selected_audio_input: Option<usize>,
+    selected_audio_output: Option<usize>,
 }
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -89,6 +86,10 @@ impl Default for OwlWaveApp {
             grid: Grid::new(8, 8, 256),
             log: String::new(),
             dropped_files: Vec::<egui::DroppedFile>::new(),
+            audio_handler: AudioHandler::new(),
+            selected_audio_host: None,
+            selected_audio_input: None,
+            selected_audio_output: None,
         }
     }
 }
@@ -101,7 +102,7 @@ impl epi::App for OwlWaveApp {
     /// Called once before the first frame.
     fn setup(
         &mut self,
-        _ctx: &egui::CtxRef,
+        _ctx: &egui::Context,
         _frame: &epi::Frame,
         _storage: Option<&dyn epi::Storage>,
     ) {
@@ -127,7 +128,7 @@ impl epi::App for OwlWaveApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &epi::Frame) {
         //let Self { label, grid } = self;
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -284,32 +285,125 @@ impl epi::App for OwlWaveApp {
 
         egui::Window::new("Audio Devices").show(ctx, |ui| {
             ui.vertical(|ui| {
-                let input_hosts = cpal::available_hosts();
-                let mut num_input_devices = 0;
-                for host_id in input_hosts {
-                    if let Ok(host) = cpal::host_from_id(host_id) {
-                        ui.label(host_id.name());
-                        let _default_in = host.default_input_device().map(|e| e.name().unwrap());
-                        let _default_out = host.default_output_device().map(|e| e.name().unwrap());
-                        let input_devices: Vec<(HostId, usize, String)> = host
-                            .input_devices()
-                            .map(|devices| {
-                                devices.enumerate().map(|(device_index, device)| {
-                                    (
-                                        host_id,
-                                        device_index + num_input_devices,
-                                        device.name().unwrap_or_else(|_| "-".to_string()),
-                                    )
-                                })
-                            })
-                            .unwrap()
-                            .collect();
-                        num_input_devices += input_devices.len();
-                        for (_host, _device_index, device_name) in input_devices.iter() {
-                            ui.label(device_name);
+                ui.horizontal(|ui| {
+                    if ui.button("🔃").clicked() || !self.audio_handler.audio_loaded {
+                        self.audio_handler.scan();
+                    }
+                    let mut label = String::new();
+                    let num_hosts = self.audio_handler.hosts.len();
+                    if num_hosts == 1 {
+                        label += "1 host";
+                    } else {
+                        label += format!("{} hosts", num_hosts).as_str();
+                    }
+                    ui.label(label);
+                });
+                ui.horizontal(|ui| {
+                    for &host_id in self.audio_handler.hosts.keys() {
+                        ui.selectable_value(
+                            &mut self.selected_audio_host,
+                            Some(host_id),
+                            host_id.name(),
+                        );
+                    }
+                });
+                //let _default_in = host.default_input_device().map(|e| e.name().unwrap());
+                //let _default_out = host.default_output_device().map(|e| e.name().unwrap());
+                egui::Grid::new("audio-grid").show(ui, |ui| {
+                    if let Some(host_id) = self.selected_audio_host {
+                        //let host = self.audio_handler.hosts.get(&host_id).unwrap();
+                        let input_devices = self.audio_handler.input_devices.get(&host_id);
+                        //.unwrap()
+                        //.iter();
+                        let output_devices = self.audio_handler.output_devices.get(&host_id);
+                        //.unwrap()
+                        //.iter();
+                        let mut selected_audio_input = self.selected_audio_input;
+                        let mut selected_audio_output = self.selected_audio_output;
+                        /*
+                        #[cfg(all(
+                            any(
+                                target_os = "linux",
+                                target_os = "dragonfly",
+                                target_os = "freebsd"
+                            ),
+                            feature = "jack"
+                        ))]
+                         */
+                        //if host_id == cpal::HostId::Jack {
+                        //let in_device = input_devices.next().unwrap();
+                        //let out_device = input_devices.next().unwrap();
+                        //output_devices = input_devices;
+                        //input_devices = vec![*in_device].iter();
+                        //output_devices = vec![*out_device].iter();
+                        //}
+                        if let (Some(in_devices), Some(out_devices)) =
+                            (input_devices, output_devices)
+                        {
+                            for (i, pair) in in_devices
+                                .iter()
+                                .zip_longest(out_devices.iter())
+                                .enumerate()
+                            {
+                                match pair {
+                                    Both(input_device, output_device) => {
+                                        let input_name = input_device
+                                            .name()
+                                            .unwrap_or_else(|_| " - ".to_string());
+                                        ui.radio_value(
+                                            &mut selected_audio_input,
+                                            Some(i),
+                                            input_name,
+                                        );
+                                        let output_name = output_device
+                                            .name()
+                                            .unwrap_or_else(|_| " - ".to_string());
+                                        ui.radio_value(
+                                            &mut selected_audio_output,
+                                            Some(i),
+                                            output_name,
+                                        );
+                                    }
+                                    Right(output_device) => {
+                                        let output_name = output_device
+                                            .name()
+                                            .unwrap_or_else(|_| " - ".to_string());
+                                        ui.radio_value(
+                                            &mut selected_audio_output,
+                                            Some(i),
+                                            output_name,
+                                        );
+                                        ui.label("");
+                                    }
+                                    Left(input_device) => {
+                                        ui.label("".to_string());
+                                        let input_name = input_device
+                                            .name()
+                                            .unwrap_or_else(|_| " - ".to_string());
+                                        ui.radio_value(
+                                            &mut selected_audio_input,
+                                            Some(i),
+                                            input_name,
+                                        );
+                                    }
+                                }
+                                ui.end_row()
+                            }
+                            if selected_audio_input != self.selected_audio_input {
+                                // Connect to a different input
+                                self.audio_handler
+                                    .select_input(self.selected_audio_host, selected_audio_input);
+                                self.selected_audio_input = selected_audio_input
+                            }
+                            if selected_audio_output != self.selected_audio_output {
+                                // Connect to a different input
+                                self.audio_handler
+                                    .select_output(self.selected_audio_host, selected_audio_output);
+                                self.selected_audio_output = selected_audio_output
+                            }
                         }
                     }
-                }
+                });
             });
         });
 
@@ -332,7 +426,7 @@ impl epi::App for OwlWaveApp {
                     self.midi_loaded = true;
                 }
 
-                egui::Grid::new("grid").show(ui, |ui| {
+                egui::Grid::new("midi-grid").show(ui, |ui| {
                     let mut selected_input_port = *self.midi_input.get_selected_port_mut();
                     let mut selected_output_port = *self.midi_output.get_selected_port_mut();
                     for pair in self
@@ -343,34 +437,34 @@ impl epi::App for OwlWaveApp {
                         .zip_longest(self.midi_output.names.iter().enumerate())
                     {
                         match pair {
-                            Both((i, in_port_name), (j, out_port_name)) => {
+                            Both((i, out_port_name), (j, in_port_name)) => {
                                 let show_in = self.midi_devices.show_midi_device(in_port_name);
                                 let show_out = self.midi_devices.show_midi_device(out_port_name);
                                 if show_in || show_out {
-                                    if show_in {
-                                        ui.radio_value(&mut selected_input_port, i, in_port_name);
+                                    if show_out {
+                                        ui.radio_value(&mut selected_output_port, i, out_port_name);
                                     } else {
                                         ui.label("");
                                     }
-                                    if show_out {
-                                        ui.radio_value(&mut selected_output_port, j, out_port_name);
+                                    if show_in {
+                                        ui.radio_value(&mut selected_input_port, j, in_port_name);
                                     } else {
                                         ui.label("");
                                     }
                                     ui.end_row()
                                 }
                             }
-                            Left((i, in_port_name)) => {
-                                if self.midi_devices.show_midi_device(in_port_name) {
-                                    ui.radio_value(&mut selected_input_port, i, in_port_name);
+                            Left((i, out_port_name)) => {
+                                if self.midi_devices.show_midi_device(out_port_name) {
+                                    ui.radio_value(&mut selected_output_port, i, out_port_name);
                                     ui.label("");
                                     ui.end_row();
                                 }
                             }
-                            Right((j, out_port_name)) => {
-                                if self.midi_devices.show_midi_device(out_port_name) {
+                            Right((j, in_port_name)) => {
+                                if self.midi_devices.show_midi_device(in_port_name) {
                                     ui.label("");
-                                    ui.radio_value(&mut selected_output_port, j, out_port_name);
+                                    ui.radio_value(&mut selected_input_port, j, in_port_name);
                                     ui.end_row()
                                 }
                             }
@@ -447,7 +541,7 @@ impl epi::App for OwlWaveApp {
 }
 
 impl OwlWaveApp {
-    fn ui_file_drag_and_drop(&mut self, ctx: &egui::CtxRef) {
+    fn ui_file_drag_and_drop(&mut self, ctx: &egui::Context) {
         use egui::*;
 
         // Preview hovering files:
@@ -472,7 +566,7 @@ impl OwlWaveApp {
                 screen_rect.center(),
                 Align2::CENTER_CENTER,
                 text,
-                TextStyle::Heading,
+                FontId::monospace(14.0),
                 Color32::WHITE,
             );
         }
