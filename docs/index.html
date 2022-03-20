@@ -126,10 +126,10 @@
         console.debug("loading wasm…");
         wasm_bindgen("./owl_wave_bg.wasm")
             .then(on_wasm_loaded)
-            .catch(console.error);
+            .catch(on_wasm_error);
 
         function on_wasm_loaded() {
-            console.log("loaded wasm, starting egui app…");
+            console.debug("loaded wasm, starting egui app…");
 
             // This call installs a bunch of callbacks and then returns:
             wasm_bindgen.start("the_canvas_id");
