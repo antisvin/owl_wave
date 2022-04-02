@@ -87,23 +87,6 @@ impl AudioHandler {
                     .with_max_sample_rate();
                 let sample_format = supported_config.sample_format();
                 let config = supported_config.into();
-                /*
-                let stream = match sample_format {
-                    SampleFormat::F32 => {
-                        device.build_output_stream(&config, write_silence::<f32>, err_fn)
-                    }
-                    SampleFormat::I16 => {
-                        device.build_output_stream(&config, write_silence::<i16>, err_fn)
-                    }
-                    SampleFormat::U16 => {
-                        device.build_output_stream(&config, write_silence::<u16>, err_fn)
-                    }
-                };
-                self.output_stream = stream.ok();
-                //let stream = &self.output_stream;
-                self.output_stream.as_ref().unwrap().play()?;
-                 */
-
                 self.output_stream = match sample_format {
                     cpal::SampleFormat::F32 => Some(self.run::<f32>(device, &config)),
                     cpal::SampleFormat::I16 => Some(self.run::<i16>(device, &config)),

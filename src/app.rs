@@ -311,97 +311,65 @@ impl epi::App for OwlWaveApp {
                 //let _default_out = host.default_output_device().map(|e| e.name().unwrap());
                 egui::Grid::new("audio-grid").show(ui, |ui| {
                     if let Some(host_id) = self.selected_audio_host {
-                        //let host = self.audio_handler.hosts.get(&host_id).unwrap();
-                        let input_devices = self.audio_handler.input_devices.get(&host_id);
-                        //.unwrap()
-                        //.iter();
-                        let output_devices = self.audio_handler.output_devices.get(&host_id);
-                        //.unwrap()
-                        //.iter();
+                        let in_devices = self
+                            .audio_handler
+                            .input_devices
+                            .get(&host_id)
+                            .into_iter()
+                            .flatten();
+                        let out_devices = self
+                            .audio_handler
+                            .output_devices
+                            .get(&host_id)
+                            .into_iter()
+                            .flatten();
                         let mut selected_audio_input = self.selected_audio_input;
                         let mut selected_audio_output = self.selected_audio_output;
-                        /*
-                        #[cfg(all(
-                            any(
-                                target_os = "linux",
-                                target_os = "dragonfly",
-                                target_os = "freebsd"
-                            ),
-                            feature = "jack"
-                        ))]
-                         */
-                        //if host_id == cpal::HostId::Jack {
-                        //let in_device = input_devices.next().unwrap();
-                        //let out_device = input_devices.next().unwrap();
-                        //output_devices = input_devices;
-                        //input_devices = vec![*in_device].iter();
-                        //output_devices = vec![*out_device].iter();
-                        //}
-                        if let (Some(in_devices), Some(out_devices)) =
-                            (input_devices, output_devices)
-                        {
-                            for (i, pair) in in_devices
-                                .iter()
-                                .zip_longest(out_devices.iter())
-                                .enumerate()
-                            {
-                                match pair {
-                                    Both(input_device, output_device) => {
-                                        let input_name = input_device
-                                            .name()
-                                            .unwrap_or_else(|_| " - ".to_string());
-                                        ui.radio_value(
-                                            &mut selected_audio_input,
-                                            Some(i),
-                                            input_name,
-                                        );
-                                        let output_name = output_device
-                                            .name()
-                                            .unwrap_or_else(|_| " - ".to_string());
-                                        ui.radio_value(
-                                            &mut selected_audio_output,
-                                            Some(i),
-                                            output_name,
-                                        );
-                                    }
-                                    Right(output_device) => {
-                                        let output_name = output_device
-                                            .name()
-                                            .unwrap_or_else(|_| " - ".to_string());
-                                        ui.radio_value(
-                                            &mut selected_audio_output,
-                                            Some(i),
-                                            output_name,
-                                        );
-                                        ui.label("");
-                                    }
-                                    Left(input_device) => {
-                                        ui.label("".to_string());
-                                        let input_name = input_device
-                                            .name()
-                                            .unwrap_or_else(|_| " - ".to_string());
-                                        ui.radio_value(
-                                            &mut selected_audio_input,
-                                            Some(i),
-                                            input_name,
-                                        );
-                                    }
+                        for (i, pair) in in_devices.zip_longest(out_devices).enumerate() {
+                            match pair {
+                                Both(input_device, output_device) => {
+                                    let input_name =
+                                        input_device.name().unwrap_or_else(|_| " - ".to_string());
+                                    ui.radio_value(&mut selected_audio_input, Some(i), input_name);
+                                    let output_name =
+                                        output_device.name().unwrap_or_else(|_| " - ".to_string());
+                                    ui.radio_value(
+                                        &mut selected_audio_output,
+                                        Some(i),
+                                        output_name,
+                                    );
                                 }
-                                ui.end_row()
+                                Right(output_device) => {
+                                    let output_name =
+                                        output_device.name().unwrap_or_else(|_| " - ".to_string());
+                                    ui.radio_value(
+                                        &mut selected_audio_output,
+                                        Some(i),
+                                        output_name,
+                                    );
+                                    ui.label("");
+                                }
+                                Left(input_device) => {
+                                    ui.label("".to_string());
+                                    let input_name =
+                                        input_device.name().unwrap_or_else(|_| " - ".to_string());
+                                    ui.radio_value(&mut selected_audio_input, Some(i), input_name);
+                                }
                             }
-                            if selected_audio_input != self.selected_audio_input {
-                                // Connect to a different input
-                                self.audio_handler
-                                    .select_input(self.selected_audio_host, selected_audio_input);
-                                self.selected_audio_input = selected_audio_input
-                            }
-                            if selected_audio_output != self.selected_audio_output {
-                                // Connect to a different input
-                                self.audio_handler
-                                    .select_output(self.selected_audio_host, selected_audio_output)
-                                    .unwrap();
-                                self.selected_audio_output = selected_audio_output
-                            }
+                            ui.end_row()
+                        }
+                        if selected_audio_input != self.selected_audio_input {
+                            // Connect to a different input
+                            self.audio_handler
+                                .select_input(self.selected_audio_host, selected_audio_input);
+                            self.selected_audio_input = selected_audio_input
+                        }
+                        if selected_audio_output != self.selected_audio_output {
+                            // Connect to a different input
+                            self.audio_handler
+                                .select_output(self.selected_audio_host, selected_audio_output)
+                                .unwrap();
+                            self.selected_audio_output = selected_audio_output
                         }
                     }
                 });
