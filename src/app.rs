@@ -451,19 +451,93 @@ impl epi::App for OwlWaveApp {
                     }
                 });
 
-                ui.horizontal(|ui| {
-                    if ui.button("Info").clicked() {
-                        if let Some(connection) = &mut self.midi_output.connection {
-                            self.owl_command_processor
-                                .request_settings(
-                                    connection,
-                                    OpenWareMidiSysexCommand::SYSEX_FIRMWARE_VERSION,
-                                )
-                                .unwrap();
-                        }
-                    }
-                });
                 if self.midi_devices == MidiDeviceSelection::Owl {
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui.button("Firmware name").clicked() {
+                            if let Some(connection) = &mut self.midi_output.connection {
+                                self.owl_command_processor
+                                    .request_settings(
+                                        connection,
+                                        OpenWareMidiSysexCommand::SYSEX_FIRMWARE_VERSION,
+                                    )
+                                    .unwrap();
+                            }
+                        };
+                        if ui.button("Patches").clicked() {
+                            if let Some(connection) = &mut self.midi_output.connection {
+                                self.owl_command_processor
+                                    .request_settings(
+                                        connection,
+                                        OpenWareMidiSysexCommand::SYSEX_PRESET_NAME_COMMAND,
+                                    )
+                                    .unwrap();
+                            }
+                        };
+                        if ui.button("Resources").clicked() {
+                            if let Some(connection) = &mut self.midi_output.connection {
+                                self.owl_command_processor
+                                    .request_settings(
+                                        connection,
+                                        OpenWareMidiSysexCommand::SYSEX_RESOURCE_NAME_COMMAND,
+                                    )
+                                    .unwrap();
+                            }
+                        };
+                        if ui.button("Reset").clicked() {
+                            if let Some(connection) = &mut self.midi_output.connection {
+                                self.owl_command_processor
+                                    .send_sysex_command(
+                                        connection,
+                                        OpenWareMidiSysexCommand::SYSEX_DEVICE_RESET_COMMAND,
+                                    )
+                                    .unwrap();
+                            }
+                        }
+                    });
+
+                    egui::SidePanel::left("patches-panel")
+                        .resizable(true)
+                        .default_width(150.0)
+                        .width_range(80.0..=200.0)
+                        .show_inside(ui, |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.heading("Patches");
+                            });
+                            egui::ScrollArea::vertical().show(ui, |ui| {
+                                for (i, patch) in
+                                    self.owl_command_processor.preset_names.iter().enumerate()
+                                {
+                                    ui.label(format!("{:>2}. {}", i + 1, patch));
+                                }
+                            });
+                        });
+
+                    egui::SidePanel::right("resources-panel")
+                        .resizable(true)
+                        .default_width(150.0)
+                        .width_range(80.0..=200.0)
+                        .show_inside(ui, |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.heading("Resources");
+                            });
+                            egui::ScrollArea::vertical().show(ui, |ui| {
+                                for (i, patch) in
+                                    self.owl_command_processor.resource_names.iter().enumerate()
+                                {
+                                    ui.label(format!("{:>2}. {}", i + 1, patch));
+                                }
+                            });
+                        });
+                    egui::CentralPanel::default().show_inside(ui, |ui| {
+                        ui.vertical_centered(|ui| {
+                            ui.heading("Log");
+                        });
+                        egui::ScrollArea::vertical().show(ui, |ui| {
+                            ui.label(&self.log);
+                        });
+                    });
+                    //ui.horizontal(|ui|{});
                     if let Ok(mut data_guard) = self.midi_log.lock() {
                         //data_guard.iter(|| wmidi::MidiMessage::try_from().unwrap());
                         let bytes = data_guard.as_mut_slice();
@@ -478,11 +552,13 @@ impl epi::App for OwlWaveApp {
                                         if let Ok(_result) =
                                             self.owl_command_processor.handle_response(&buf, size)
                                         {
-                                            self.log += format!(
-                                                "{}\n",
-                                                self.owl_command_processor.output.as_ref().unwrap()
-                                            )
-                                            .as_str()
+                                            /*
+                                            if let Some(output) = &self.owl_command_processor.output
+                                            {
+                                                let s = format!("{}\n", output);
+                                                self.log += s.as_str()
+                                            }
+                                            */
                                         }
                                     }
                                     //for byte in buf.iter().take(size) {

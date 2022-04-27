@@ -1,9 +1,9 @@
 [package]
 name = "owl_wave"
-version = "0.3.1"
+version = "0.3.3"
 authors = ["Stas Shtin <antisvin@gmail.com>"]
 edition = "2021"
-rust-version = "1.58"
+rust-version = "1.60"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
