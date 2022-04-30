@@ -6,6 +6,9 @@ use crate::{
 };
 use cpal::traits::DeviceTrait;
 use cpal::HostId;
+use eframe::emath::Align;
+use eframe::epaint::text::LayoutJob;
+use eframe::epaint::{Color32, FontId};
 use eframe::{
     egui::{
         self,
@@ -453,47 +456,115 @@ impl epi::App for OwlWaveApp {
 
                 if self.midi_devices == MidiDeviceSelection::Owl {
                     ui.separator();
-                    ui.horizontal(|ui| {
-                        if ui.button("Firmware name").clicked() {
-                            if let Some(connection) = &mut self.midi_output.connection {
-                                self.owl_command_processor
-                                    .request_settings(
-                                        connection,
-                                        OpenWareMidiSysexCommand::SYSEX_FIRMWARE_VERSION,
-                                    )
-                                    .unwrap();
-                            }
-                        };
-                        if ui.button("Patches").clicked() {
-                            if let Some(connection) = &mut self.midi_output.connection {
-                                self.owl_command_processor
-                                    .request_settings(
-                                        connection,
-                                        OpenWareMidiSysexCommand::SYSEX_PRESET_NAME_COMMAND,
-                                    )
-                                    .unwrap();
-                            }
-                        };
-                        if ui.button("Resources").clicked() {
-                            if let Some(connection) = &mut self.midi_output.connection {
-                                self.owl_command_processor
+
+                    egui::TopBottomPanel::top("top-panel").show_inside(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            let mut job = LayoutJob::default();
+                            let first_row_indentation = 10.0;
+                            let (default_color, strong_color) = if ui.visuals().dark_mode {
+                                (Color32::LIGHT_GRAY, Color32::WHITE)
+                            } else {
+                                (Color32::DARK_GRAY, Color32::BLACK)
+                            };
+                            job.append(
+                                "Patch name\n",
+                                first_row_indentation,
+                                egui::TextFormat {
+                                    font_id: FontId::proportional(20.0),
+                                    color: strong_color,
+                                    ..Default::default()
+                                },
+                            );
+
+                            job.append(
+                                "Firmware version\n",
+                                0.0,
+                                egui::TextFormat {
+                                    color: default_color,
+                                    ..Default::default()
+                                },
+                            );
+
+                            job.append(
+                                "Debug message ",
+                                0.0,
+                                egui::TextFormat {
+                                    color: default_color,
+                                    ..Default::default()
+                                },
+                            );
+
+                            job.append(
+                                "or error message ",
+                                0.0,
+                                egui::TextFormat {
+                                    color: Color32::DARK_RED,
+                                    ..Default::default()
+                                },
+                            );
+                            ui.label(job);
+
+                            ui.with_layout(egui::Layout::top_down_justified(Align::RIGHT), |ui| {
+                                ui.menu_button("Remote control", |ui| {
+                                    ui.menu_button("Request", |ui| {
+                                        if ui.button("Firmware name").clicked() {
+                                            if let Some(connection) =
+                                                &mut self.midi_output.connection
+                                            {
+                                                self.owl_command_processor
+                                            .request_settings(
+                                                connection,
+                                                OpenWareMidiSysexCommand::SYSEX_FIRMWARE_VERSION,
+                                            )
+                                            .unwrap();
+                                            }
+                                            ui.close_menu()
+                                        };
+                                        if ui.button("Patches").clicked() {
+                                            if let Some(connection) =
+                                                &mut self.midi_output.connection
+                                            {
+                                                self.owl_command_processor
+                                            .request_settings(
+                                                connection,
+                                                OpenWareMidiSysexCommand::SYSEX_PRESET_NAME_COMMAND,
+                                            )
+                                            .unwrap();
+                                            }
+                                            ui.close_menu()
+                                        };
+                                        if ui.button("Resources").clicked() {
+                                            if let Some(connection) =
+                                                &mut self.midi_output.connection
+                                            {
+                                                self.owl_command_processor
                                     .request_settings(
                                         connection,
                                         OpenWareMidiSysexCommand::SYSEX_RESOURCE_NAME_COMMAND,
                                     )
                                     .unwrap();
-                            }
-                        };
-                        if ui.button("Reset").clicked() {
-                            if let Some(connection) = &mut self.midi_output.connection {
-                                self.owl_command_processor
+                                            }
+                                            ui.close_menu()
+                                        };
+                                    });
+                                    ui.menu_button("Device", |ui| {
+                                        if ui.button("Reset").clicked() {
+                                            if let Some(connection) =
+                                                &mut self.midi_output.connection
+                                            {
+                                                self.owl_command_processor
                                     .send_sysex_command(
                                         connection,
                                         OpenWareMidiSysexCommand::SYSEX_DEVICE_RESET_COMMAND,
                                     )
                                     .unwrap();
-                            }
-                        }
+                                            }
+                                            ui.close_menu()
+                                        }
+                                    })
+                                })
+                            });
+                        });
                     });
 
                     egui::SidePanel::left("patches-panel")
