@@ -1,6 +1,6 @@
 [package]
 name = "owl_wave"
-version = "0.3.6"
+version = "0.3.7"
 authors = ["Stas Shtin <antisvin@gmail.com>"]
 edition = "2021"
 rust-version = "1.60"
@@ -20,7 +20,7 @@ wavetable = { git = "https://github.com/icsga/Wavetable.git", version = "0.2.0",
 #basic_dsp = "0.9.4"
 rustfft = "5.0.0"
 rfd = "0.6.3"
-owl_midi = "0.2.2"
+owl_midi = "0.3.3"
 midir = "0.7.0"
 wmidi = "4.0.6"
 itertools = "0.10.3"
@@ -41,7 +41,7 @@ tracing-wasm = "0.2"
 default = []
 #persistence = ["eframe/persistence", "serde"] # Enable if you want to persist app state on shutdown
 jack = ["cpal/jack"]
-asio = ["cpal/asio"] # Not tested yet
+#asio = ["cpal/asio"] # Not tested yet, requires downgrading bindgen to 0.54.0
 
 [profile.release]
 opt-level = 2 # fast and small wasm

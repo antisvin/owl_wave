@@ -13,8 +13,9 @@ use eframe::egui::{
 use eframe::epaint::text::LayoutJob;
 use eframe::epaint::{Color32, FontId};
 use egui::plot::{Plot, Points, Value, Values};
+use egui::Ui;
 use itertools::{EitherOrBoth::Both, EitherOrBoth::Left, EitherOrBoth::Right, Itertools};
-use owl_midi::OpenWareMidiSysexCommand;
+use owl_midi::{OpenWareMidiSysexCommand, SYSEX_CONFIGURATIONS};
 use std::io::Cursor;
 use std::sync::Mutex;
 use std::{fs::File, sync::Arc};
@@ -101,10 +102,8 @@ impl Default for OwlWaveApp {
 
 impl eframe::App for OwlWaveApp {
     /// Called by the frame work to save state before shutdown.
-    /// Note that you must enable the `persistence` feature for this to work.
-    #[cfg(feature = "persistence")]
-    fn save(&mut self, storage: &mut dyn epi::Storage) {
-        epi::set_value(storage, epi::APP_KEY, self);
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.
@@ -205,7 +204,6 @@ impl eframe::App for OwlWaveApp {
                 ))
                 .stems(-1.5)
                 .radius(1.0);
-                //ui.points(points.name("Points with stems"));
                 let plot = Plot::new("wavetable-main")
                     .view_aspect(1.0)
                     .allow_drag(false)
@@ -449,65 +447,44 @@ impl eframe::App for OwlWaveApp {
                         ui.vertical(|ui| {
                             ui.menu_button("Remote control", |ui| {
                                 ui.menu_button("Request", |ui| {
-                                    if ui.button("Firmware name").clicked() {
-                                        if let Some(connection) = &mut self.midi_output.connection {
-                                            self.owl_command_processor
-                                            .request_settings(
-                                                connection,
-                                                OpenWareMidiSysexCommand::SYSEX_FIRMWARE_VERSION,
-                                            )
-                                            .unwrap();
-                                        }
-                                        ui.close_menu()
-                                    };
-                                    if ui.button("Patches").clicked() {
-                                        if let Some(connection) = &mut self.midi_output.connection {
-                                            self.owl_command_processor
-                                            .request_settings(
-                                                connection,
-                                                OpenWareMidiSysexCommand::SYSEX_PRESET_NAME_COMMAND,
-                                            )
-                                            .unwrap();
-                                        }
-                                        ui.close_menu();
-                                        self.menu_page = MenuPage::Patches
-                                    };
-                                    if ui.button("Resources").clicked() {
-                                        if let Some(connection) = &mut self.midi_output.connection {
-                                            self.owl_command_processor
-                                    .request_settings(
-                                        connection,
+                                    self.request_settings_button(
+                                        ui,
+                                        "Firmware name",
+                                        OpenWareMidiSysexCommand::SYSEX_FIRMWARE_VERSION,
+                                        None,
+                                    );
+                                    self.request_settings_button(
+                                        ui,
+                                        "Patches",
+                                        OpenWareMidiSysexCommand::SYSEX_PRESET_NAME_COMMAND,
+                                        Some(MenuPage::Patches),
+                                    );
+                                    self.request_settings_button(
+                                        ui,
+                                        "Resources",
                                         OpenWareMidiSysexCommand::SYSEX_RESOURCE_NAME_COMMAND,
-                                    )
-                                    .unwrap();
-                                        }
-                                        ui.close_menu();
-                                        self.menu_page = MenuPage::Resources
-                                    };
-                                    if ui.button("Program stats").clicked() {
-                                        if let Some(connection) = &mut self.midi_output.connection {
-                                            self.owl_command_processor
-                                                .request_settings(
-                                                    connection,
-                                                    OpenWareMidiSysexCommand::SYSEX_PROGRAM_STATS,
-                                                )
-                                                .unwrap();
-                                        }
-                                        ui.close_menu()
-                                    };
+                                        Some(MenuPage::Resources),
+                                    );
+                                    self.request_settings_button(
+                                        ui,
+                                        "Program stats",
+                                        OpenWareMidiSysexCommand::SYSEX_PROGRAM_STATS,
+                                        None,
+                                    );
+                                    self.request_settings_button(
+                                        ui,
+                                        "Settings",
+                                        OpenWareMidiSysexCommand::SYSEX_CONFIGURATION_COMMAND,
+                                        Some(MenuPage::Settings),
+                                    );
+                                    //self.request_config_button(ui, "Settings");
                                 });
                                 ui.menu_button("Device", |ui| {
-                                    if ui.button("Reset").clicked() {
-                                        if let Some(connection) = &mut self.midi_output.connection {
-                                            self.owl_command_processor
-                                    .send_sysex_command(
-                                        connection,
+                                    self.send_sysex_button(
+                                        ui,
+                                        "Program stats",
                                         OpenWareMidiSysexCommand::SYSEX_DEVICE_RESET_COMMAND,
-                                    )
-                                    .unwrap();
-                                        }
-                                        ui.close_menu()
-                                    }
+                                    );
                                 })
                             });
 
@@ -641,7 +618,45 @@ impl eframe::App for OwlWaveApp {
                                 }
                             });
                         }
-                        MenuPage::Settings => {}
+                        MenuPage::Settings => {
+                            ui.vertical_centered(|ui| {
+                                ui.heading("Settings");
+                            });
+                            egui::Grid::new("settings-grid")
+                                .num_columns(2)
+                                .spacing([4.0, 4.0])
+                                .min_col_width(150.0)
+                                .show(ui, |ui| {
+                                    for &config in SYSEX_CONFIGURATIONS.iter() {
+                                        ui.with_layout(
+                                            egui::Layout::top_down_justified(egui::Align::Center),
+                                            |ui| {
+                                                let button =
+                                                    ui.button(format!("{:?}", config).as_str());
+                                                if button.clicked() {
+                                                    if let Some(_connection) =
+                                                        &mut self.midi_output.connection
+                                                    {
+                                                        //self.owl_command_processor
+                                                        //    .request_configuration(connection, config);
+                                                    }
+                                                }
+                                            },
+                                        );
+
+                                        ui.add(
+                                            egui::TextEdit::singleline(
+                                                self.owl_command_processor
+                                                    .settings
+                                                    .entry(config)
+                                                    .or_insert(String::new()),
+                                            )
+                                            .hint_text("Write something here"),
+                                        );
+                                        ui.end_row()
+                                    }
+                                });
+                        }
                     });
                     //ui.horizontal(|ui|{});
                     if let Ok(mut data_guard) = self.midi_log.lock() {
@@ -683,16 +698,17 @@ impl eframe::App for OwlWaveApp {
 impl OwlWaveApp {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customized the look at feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
+        if cc.integration_info.prefer_dark_mode == Some(false) {
+            cc.egui_ctx.set_visuals(egui::Visuals::light()); // use light mode if explicitly asked for
+        } else {
+            cc.egui_ctx.set_visuals(egui::Visuals::dark()); // use dark mode if there is no preference, or the preference is dark mode
+        }
 
         // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
         if let Some(storage) = cc.storage {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
-
-        Default::default()
+        Self::default()
     }
 
     fn ui_file_drag_and_drop(&mut self, ctx: &egui::Context) {
@@ -774,5 +790,52 @@ impl OwlWaveApp {
     }
     fn update_midi_output(&mut self) {
         self.midi_output = MidiOutputHandle::new("OWL wave", self.midi_output.selected_port);
+    }
+
+    fn request_settings_button(
+        &mut self,
+        ui: &mut Ui,
+        label: &str,
+        sysex: OpenWareMidiSysexCommand,
+        menu_page: Option<MenuPage>,
+    ) {
+        if ui.button(label).clicked() {
+            if let Some(connection) = &mut self.midi_output.connection {
+                self.owl_command_processor
+                    .request_settings(connection, sysex)
+                    .unwrap();
+            }
+            if let Some(page) = menu_page {
+                self.menu_page = page;
+            }
+            ui.close_menu()
+        };
+    }
+    /*
+    fn request_config_button(&mut self, ui: &mut Ui, label: &str) {
+        if ui.button(label).clicked() {
+            if let Some(connection) = &mut self.midi_output.connection {
+                self.owl_command_processor
+                    .send_cc(
+                        connection,
+                        OpenWareMidiControl::REQUEST_SETTINGS as u8,
+                        0x7f,
+                    )
+                    .unwrap();
+            }
+            self.menu_page = MenuPage::Settings;
+            ui.close_menu()
+        };
+    }
+    */
+    fn send_sysex_button(&mut self, ui: &mut Ui, label: &str, sysex: OpenWareMidiSysexCommand) {
+        if ui.button(label).clicked() {
+            if let Some(connection) = &mut self.midi_output.connection {
+                self.owl_command_processor
+                    .send_sysex_command(connection, sysex)
+                    .unwrap();
+            }
+            ui.close_menu()
+        };
     }
 }
