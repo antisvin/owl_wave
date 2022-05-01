@@ -5,7 +5,12 @@
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    let app = owl_wave::OwlWaveApp::default();
+    // Log to stdout (if you run with `RUST_LOG=debug`).
+    tracing_subscriber::fmt::init();
     let native_options = eframe::NativeOptions::default();
-    eframe::run_native(Box::new(app), native_options);
+    eframe::run_native(
+        "OWL Wave",
+        native_options,
+        Box::new(|cc| Box::new(owl_wave::OwlWaveApp::new(cc))),
+    );
 }

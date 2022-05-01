@@ -1,6 +1,6 @@
 [package]
 name = "owl_wave"
-version = "0.3.5"
+version = "0.3.6"
 authors = ["Stas Shtin <antisvin@gmail.com>"]
 edition = "2021"
 rust-version = "1.60"
@@ -11,8 +11,9 @@ rust-version = "1.60"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-eframe = "0.17.0" # Gives us egui, epi and web+native backends
-serde = { version = "1", features = ["derive"], optional = true }
+egui = "0.18.0"
+eframe = { version = "0.18.0", features = ["persistence"] }
+serde = { version = "1", features = ["derive"] } # You only need this if you want app persistence
 wavetable = { git = "https://github.com/icsga/Wavetable.git", version = "0.2.0", features = ["use_double_precision"] }
 # default_features = false }
 #, features = ["use_double_precision"] }
@@ -26,6 +27,7 @@ itertools = "0.10.3"
 anyhow = "1.0.12"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tracing-subscriber = "0.3"
 cpal = { version = "0.13.5" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -37,7 +39,7 @@ tracing-wasm = "0.2"
 
 [features]
 default = []
-persistence = ["eframe/persistence", "serde"] # Enable if you want to persist app state on shutdown
+#persistence = ["eframe/persistence", "serde"] # Enable if you want to persist app state on shutdown
 jack = ["cpal/jack"]
 asio = ["cpal/asio"] # Not tested yet
 

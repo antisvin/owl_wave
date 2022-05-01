@@ -6,15 +6,12 @@ use crate::{
 };
 use cpal::traits::DeviceTrait;
 use cpal::HostId;
+use eframe::egui::{
+    self,
+    plot::{Bar, BarChart},
+};
 use eframe::epaint::text::LayoutJob;
 use eframe::epaint::{Color32, FontId};
-use eframe::{
-    egui::{
-        self,
-        plot::{Bar, BarChart},
-    },
-    epi,
-};
 use egui::plot::{Plot, Points, Value, Values};
 use itertools::{EitherOrBoth::Both, EitherOrBoth::Left, EitherOrBoth::Right, Itertools};
 use owl_midi::OpenWareMidiSysexCommand;
@@ -32,37 +29,35 @@ enum MenuPage {
 }
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct OwlWaveApp {
-    label: String,
     active_wave_id: usize,
-
     midi_log: Arc<Mutex<Vec<u8>>>,
 
+    #[serde(skip)]
     midi_devices: MidiDeviceSelection,
-    #[cfg_attr(feature = "persistence", serde(skip))]
+    #[serde(skip)]
     midi_input: MidiInputHandle<Arc<Mutex<Vec<u8>>>>,
-    #[cfg_attr(feature = "persistence", serde(skip))]
+    #[serde(skip)]
     owl_command_processor: OwlCommandProcessor,
-    #[cfg_attr(feature = "persistence", serde(skip))]
+    #[serde(skip)]
     midi_output: MidiOutputHandle,
-    #[cfg_attr(feature = "persistence", serde(skip))]
+    #[serde(skip)]
     midi_loaded: bool,
-    #[cfg_attr(feature = "persistence", serde(skip))]
+    #[serde(skip)]
     show_about: bool,
-    #[cfg_attr(feature = "persistence", serde(skip))]
+    #[serde(skip)]
     grid: Grid,
-    #[cfg_attr(feature = "persistence", serde(skip))]
-    log: String,
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[serde(skip)]
     dropped_files: Vec<egui::DroppedFile>,
-    #[cfg_attr(feature = "persistence", serde(skip))]
+    #[serde(skip)]
     audio_handler: AudioHandler,
-    #[cfg_attr(feature = "persistence", serde(skip))]
+    #[serde(skip)]
     selected_audio_host: Option<HostId>,
     selected_audio_input: Option<usize>,
     selected_audio_output: Option<usize>,
+    #[serde(skip)]
     menu_page: MenuPage,
 }
 
@@ -83,7 +78,6 @@ impl Default for OwlWaveApp {
             midi_log.clone(),
         );
         Self {
-            label: format!("OWL Wave {}", VERSION),
             active_wave_id: 0,
             midi_log,
             owl_command_processor: OwlCommandProcessor::new(),
@@ -94,7 +88,7 @@ impl Default for OwlWaveApp {
             midi_loaded: false,
             show_about: false,
             grid: Grid::new(8, 8, 256),
-            log: String::new(),
+            //log: String::new(),
             dropped_files: Vec::<egui::DroppedFile>::new(),
             audio_handler: AudioHandler::new(),
             selected_audio_host: None,
@@ -105,31 +99,7 @@ impl Default for OwlWaveApp {
     }
 }
 
-impl epi::App for OwlWaveApp {
-    fn name(&self) -> &str {
-        self.label.as_str()
-    }
-
-    /// Called once before the first frame.
-    fn setup(
-        &mut self,
-        _ctx: &egui::Context,
-        _frame: &epi::Frame,
-        _storage: Option<&dyn epi::Storage>,
-    ) {
-        //self.fft_context = start_fft_thread();
-        //let mut planner = get_fft_planner();
-
-        // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
-        #[cfg(feature = "persistence")]
-        if let Some(storage) = _storage {
-            *self = epi::get_value(storage, epi::APP_KEY).unwrap_or_default()
-        }
-
-        //self.grid = Grid::new(8, 8, 256)
-    }
-
+impl eframe::App for OwlWaveApp {
     /// Called by the frame work to save state before shutdown.
     /// Note that you must enable the `persistence` feature for this to work.
     #[cfg(feature = "persistence")]
@@ -139,7 +109,7 @@ impl epi::App for OwlWaveApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::Context, frame: &epi::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         //let Self { label, grid } = self;
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -195,10 +165,13 @@ impl epi::App for OwlWaveApp {
                     .stems(-1.5)
                     .radius(1.0);
                     //ui.points(points.name("Points with stems"));
-                    let plot = Plot::new("Points")
+                    let plot = Plot::new(format!("points-{i}"))
                         .view_aspect(1.0)
+                        .show_axes([false, true])
                         .allow_drag(false)
-                        .show_axes([false, true]);
+                        .allow_scroll(false)
+                        .allow_zoom(false)
+                        .allow_boxed_zoom(false);
                     //ui.add(plot);
                     let plot = plot.show_background(self.active_wave_id == i);
                     let response = plot.show(ui, |plot_ui| plot_ui.points(points)).response;
@@ -233,9 +206,12 @@ impl epi::App for OwlWaveApp {
                 .stems(-1.5)
                 .radius(1.0);
                 //ui.points(points.name("Points with stems"));
-                let plot = Plot::new("Points")
+                let plot = Plot::new("wavetable-main")
                     .view_aspect(1.0)
                     .allow_drag(false)
+                    .allow_scroll(false)
+                    .allow_zoom(false)
+                    .allow_boxed_zoom(false)
                     .show_axes([false, true]);
                 plot.show(ui, |plot_ui| plot_ui.points(points));
 
@@ -252,9 +228,10 @@ impl epi::App for OwlWaveApp {
                         })
                         .collect(),
                 );
-                let harm_plot = Plot::new("Harmonics")
+                let harm_plot = Plot::new("harmonics-main")
                     .view_aspect(4.0)
                     .allow_drag(false)
+                    .allow_scroll(false)
                     .show_axes([false, true]);
                 harm_plot.show(ui, |plot_ui| plot_ui.bar_chart(harmonics));
             })
@@ -264,8 +241,8 @@ impl epi::App for OwlWaveApp {
             egui::Grid::new("grid").show(ui, |ui| {
                 let samples = self.grid.get_samples() as f64;
                 let mut wave_id = 0;
-                for _i in 0..self.grid.get_rows() {
-                    for _j in 0..self.grid.get_cols() {
+                for i in 0..self.grid.get_rows() {
+                    for j in 0..self.grid.get_cols() {
                         let points = Points::new(Values::from_values(
                             self.grid
                                 .get_wave_by_id(wave_id)
@@ -277,9 +254,12 @@ impl epi::App for OwlWaveApp {
                         .stems(-1.5)
                         .radius(1.0);
                         //ui.points(points.name("Points with stems"));
-                        let plot = Plot::new("Points")
+                        let plot = Plot::new(format!("plot-{i}-{j}"))
                             .view_aspect(1.0)
                             .allow_drag(false)
+                            .allow_scroll(false)
+                            .allow_zoom(false)
+                            .allow_boxed_zoom(false)
                             .show_axes([false, true]);
                         //ui.add(plot);
                         let plot = plot.show_background(self.active_wave_id == wave_id);
@@ -625,9 +605,11 @@ impl epi::App for OwlWaveApp {
                             ui.vertical_centered(|ui| {
                                 ui.heading("Log");
                             });
-                            egui::ScrollArea::vertical().show(ui, |ui| {
-                                ui.label(&self.log);
-                            });
+                            egui::ScrollArea::vertical()
+                                .auto_shrink([false, true])
+                                .show(ui, |ui| {
+                                    ui.label(&self.owl_command_processor.log);
+                                });
                         });
                     egui::CentralPanel::default().show_inside(ui, |ui| match self.menu_page {
                         MenuPage::Parameters => {}
@@ -685,22 +667,11 @@ impl epi::App for OwlWaveApp {
                                             */
                                         }
                                     }
-                                    //for byte in buf.iter().take(size) {
-                                    //    self.log += format!("{:x?}", byte).as_str();
-                                    //}
                                 }
                             }
                         }
                         data_guard.clear();
-                        //data_guard.
-
-                        //for byte in data_guard.iter_mut() {
-                        //    if let MidiMessage::SysEx(bytes) = MidiMessage::try_from(byte) {}
-                        //}
-
-                        //midi_handler.messages.pop() {
                     }
-                    ui.label(self.log.clone());
                 }
             });
         });
@@ -710,6 +681,20 @@ impl epi::App for OwlWaveApp {
 }
 
 impl OwlWaveApp {
+    /// Called once before the first frame.
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // This is also where you can customized the look at feel of egui using
+        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
+
+        // Load previous app state (if any).
+        // Note that you must enable the `persistence` feature for this to work.
+        if let Some(storage) = cc.storage {
+            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+        }
+
+        Default::default()
+    }
+
     fn ui_file_drag_and_drop(&mut self, ctx: &egui::Context) {
         use egui::*;
 

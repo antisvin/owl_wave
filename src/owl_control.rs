@@ -1,27 +1,37 @@
 use midir::MidiOutputConnection;
-use owl_midi::OpenWareMidiSysexCommand;
+use owl_midi::{OpenWareMidiSysexCommand, PatchParameterId};
 use wmidi::{Channel, ControlFunction, Error, MidiMessage, U7};
+
+pub struct OwlParameter {
+    pub id: PatchParameterId,
+    pub name: String,
+    pub value: f32,
+}
 
 pub struct OwlCommandProcessor {
     pub firmware_version: Option<String>,
+    pub parameters: Vec<Option<OwlParameter>>,
     pub program_message: Option<String>,
     pub patch_name: Option<String>,
     pub patch_names: Vec<String>,
     pub resource_offset: usize,
     pub resource_names: Vec<String>,
     pub program_stats: Option<String>,
+    pub log: String,
 }
 
 impl OwlCommandProcessor {
     pub const fn new() -> Self {
         OwlCommandProcessor {
             firmware_version: None,
+            parameters: Vec::new(),
             program_message: None,
             patch_name: None,
             patch_names: Vec::new(),
             resource_offset: 0,
             resource_names: Vec::new(),
             program_stats: None,
+            log: String::new(),
         }
     }
     pub fn request_settings(
@@ -88,12 +98,12 @@ impl OwlCommandProcessor {
                 Some(&cmd) => {
                     match cmd {
                         cmd if OpenWareMidiSysexCommand::SYSEX_FIRMWARE_VERSION as u8 == cmd => {
-                            println!("FW");
-                            self.firmware_version =
-                                Some(String::from_utf8_lossy(&data[4..size - 1]).to_string());
+                            let firmware_version = String::from_utf8_lossy(&data[4..size - 1]);
+                            self.firmware_version = Some(firmware_version.to_string());
+                            self.log +=
+                                format!("< FIRMWARE_VERSION = {firmware_version}\n").as_str();
                         }
                         cmd if OpenWareMidiSysexCommand::SYSEX_PRESET_NAME_COMMAND as u8 == cmd => {
-                            println!("NAME");
                             let pos = data[4] as usize;
                             if pos >= self.patch_names.len() {
                                 self.patch_names.resize(pos + 1, String::new());
@@ -111,12 +121,13 @@ impl OwlCommandProcessor {
                             if !self.patch_names.is_empty() {
                                 self.patch_name = Some(self.patch_names[0].clone());
                             }
-                            println!("P {} = {}", pos, self.patch_names[pos]);
+                            self.log +=
+                                format!("< PATCH_NAME {} = {}\n", pos, self.patch_names[pos])
+                                    .as_str();
                         }
                         cmd if OpenWareMidiSysexCommand::SYSEX_RESOURCE_NAME_COMMAND as u8
                             == cmd =>
                         {
-                            println!("RES");
                             let mut pos = data[4] as usize;
                             if self.resource_names.is_empty() {
                                 self.resource_offset = pos;
@@ -137,18 +148,22 @@ impl OwlCommandProcessor {
                             }
                             self.resource_names[pos] =
                                 String::from_utf8_lossy(&data[5..end]).to_string();
-                            println!("R {} = {}", pos, self.resource_names[pos]);
+                            self.log +=
+                                format!("< RESOURCE_NAME {} = {}\n", pos, self.resource_names[pos])
+                                    .as_str();
                         }
                         cmd if OpenWareMidiSysexCommand::SYSEX_PROGRAM_MESSAGE as u8 == cmd => {
-                            println!("PROGRAM MESSAGE");
-                            self.program_message =
-                                Some(String::from_utf8_lossy(&data[4..size - 1]).to_string());
+                            let program_message = String::from_utf8_lossy(&data[4..size - 1]);
+                            self.program_message = Some(program_message.to_string());
+                            self.log += format!("< PROGRAM_MESSAGE = {program_message}").as_str();
                         }
                         cmd if OpenWareMidiSysexCommand::SYSEX_PROGRAM_STATS as u8 == cmd => {
-                            println!("STATS");
-                            self.program_stats =
-                                Some(String::from_utf8_lossy(&data[4..size - 1]).to_string());
+                            let stats = String::from_utf8_lossy(&data[4..size - 1]);
+                            self.program_stats = Some(stats.to_string());
+                            self.log += format!("< PROGRAM_STATS {stats}").as_str();
                         }
+                        //cmd if OpenWareMidiSysexCommand::SYSEX_PARAMETER_NAME_COMMAND as u8 == cmd => {
+                        //}
                         _ => {
                             println!("CMD={}", cmd as u8)
                         }
