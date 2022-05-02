@@ -22,6 +22,7 @@ use std::{fs::File, sync::Arc};
 use wavetable::WavHandler;
 use wmidi::MidiMessage;
 
+#[derive(PartialEq)]
 enum MenuPage {
     Parameters,
     Patches,
@@ -560,18 +561,10 @@ impl eframe::App for OwlWaveApp {
                         .width_range(80.0..=200.0)
                         .show_inside(ui, |ui| {
                             ui.vertical_centered_justified(|ui| {
-                                if ui.button("Parameters").clicked() {
-                                    self.menu_page = MenuPage::Parameters
-                                }
-                                if ui.button("Patches").clicked() {
-                                    self.menu_page = MenuPage::Patches
-                                }
-                                if ui.button("Resources").clicked() {
-                                    self.menu_page = MenuPage::Resources
-                                }
-                                if ui.button("Settings").clicked() {
-                                    self.menu_page = MenuPage::Settings
-                                }
+                                self.show_menu_page(ui, "Parameters", MenuPage::Parameters);
+                                self.show_menu_page(ui, "Patches", MenuPage::Patches);
+                                self.show_menu_page(ui, "Resources", MenuPage::Resources);
+                                self.show_menu_page(ui, "Settings", MenuPage::Settings);
                             });
                         });
 
@@ -810,6 +803,14 @@ impl OwlWaveApp {
             }
             ui.close_menu()
         };
+    }
+    fn show_menu_page(&mut self, ui: &mut Ui, label: &str, menu_page: MenuPage) {
+        if ui
+            .add_enabled(self.menu_page != menu_page, egui::Button::new(label))
+            .clicked()
+        {
+            self.menu_page = menu_page;
+        }
     }
     /*
     fn request_config_button(&mut self, ui: &mut Ui, label: &str) {
