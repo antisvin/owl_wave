@@ -483,7 +483,12 @@ impl eframe::App for OwlWaveApp {
                                 ui.menu_button("Device", |ui| {
                                     self.send_sysex_button(
                                         ui,
-                                        "Program stats",
+                                        "Bootloader",
+                                        OpenWareMidiSysexCommand::SYSEX_BOOTLOADER_COMMAND,
+                                    );
+                                    self.send_sysex_button(
+                                        ui,
+                                        "Reset",
                                         OpenWareMidiSysexCommand::SYSEX_DEVICE_RESET_COMMAND,
                                     );
                                 })
