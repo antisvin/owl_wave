@@ -561,10 +561,10 @@ impl eframe::App for OwlWaveApp {
                         .width_range(80.0..=200.0)
                         .show_inside(ui, |ui| {
                             ui.vertical_centered_justified(|ui| {
-                                self.show_menu_page(ui, "Parameters", MenuPage::Parameters);
-                                self.show_menu_page(ui, "Patches", MenuPage::Patches);
-                                self.show_menu_page(ui, "Resources", MenuPage::Resources);
-                                self.show_menu_page(ui, "Settings", MenuPage::Settings);
+                                /*self.show_menu_page(ui, "Parameters", MenuPage::Parameters, None);*/
+                                self.show_menu_page(ui, "Patches", MenuPage::Patches, Some(OpenWareMidiSysexCommand::SYSEX_PRESET_NAME_COMMAND));
+                                self.show_menu_page(ui, "Resources", MenuPage::Resources, Some(OpenWareMidiSysexCommand::SYSEX_RESOURCE_NAME_COMMAND));
+                                self.show_menu_page(ui, "Settings", MenuPage::Settings, Some(OpenWareMidiSysexCommand::SYSEX_CONFIGURATION_COMMAND));
                             });
                         });
 
@@ -624,14 +624,39 @@ impl eframe::App for OwlWaveApp {
                                         ui.with_layout(
                                             egui::Layout::top_down_justified(egui::Align::Center),
                                             |ui| {
-                                                let button =
-                                                    ui.button(format!("{:?}", config).as_str());
-                                                if button.clicked() {
-                                                    if let Some(_connection) =
+                                                let current_value = self
+                                                    .owl_command_processor
+                                                    .settings
+                                                    .get(&config)
+                                                    .map(|x| x.as_str())
+                                                    .unwrap_or("");
+                                                let parsed_value = current_value.parse::<i64>();
+                                                let valid_value = parsed_value
+                                                    .as_ref()
+                                                    .ok()
+                                                    .and(Some(true))
+                                                    .unwrap_or(false);
+                                                let button = ui.add_enabled(
+                                                    valid_value,
+                                                    egui::Button::new(format!("{:?}", config)),
+                                                );
+                                                if valid_value && button.clicked() {
+                                                    if let Some(connection) =
                                                         &mut self.midi_output.connection
                                                     {
-                                                        //self.owl_command_processor
-                                                        //    .request_configuration(connection, config);
+                                                        let data = String::from_utf8([(config as isize >> 8) as u8,
+                                                            ((config as isize) & 0xff) as u8,].to_vec()).unwrap() + format!(
+                                                            "{:x}",
+                                                            parsed_value.unwrap()
+                                                        ).as_str();
+                                                        let sysex = data.as_bytes();
+                                                        self.owl_command_processor
+                                                            .send_sysex_string(
+                                                                connection,
+                                                                OpenWareMidiSysexCommand::SYSEX_CONFIGURATION_COMMAND,
+                                                                sysex
+                                                            )
+                                                            .unwrap();
                                                     }
                                                 }
                                             },
@@ -644,10 +669,29 @@ impl eframe::App for OwlWaveApp {
                                                     .entry(config)
                                                     .or_insert(String::new()),
                                             )
-                                            .hint_text("Write something here"),
+                                            .hint_text("Edit value"),
                                         );
                                         ui.end_row()
-                                    }
+                                    };
+                                    ui.horizontal(|ui|{
+                                            if ui.button("Save ").clicked() {
+                                                if let Some(connection) =
+                                                        &mut self.midi_output.connection
+                                                    {
+                                                self.owl_command_processor.send_sysex_command(
+                                                    connection, OpenWareMidiSysexCommand::SYSEX_SETTINGS_STORE).unwrap();
+                                                    }
+                                            };
+                                            if ui.button("Reset").clicked() {
+                                                if let Some(connection) =
+                                                        &mut self.midi_output.connection
+                                                    {
+                                                self.owl_command_processor.send_sysex_command(
+                                                    connection, OpenWareMidiSysexCommand::SYSEX_SETTINGS_STORE).unwrap();
+                                                    }
+
+                                            }
+                                    });
                                 });
                         }
                     });
@@ -804,12 +848,23 @@ impl OwlWaveApp {
             ui.close_menu()
         };
     }
-    fn show_menu_page(&mut self, ui: &mut Ui, label: &str, menu_page: MenuPage) {
+    fn show_menu_page(
+        &mut self,
+        ui: &mut Ui,
+        label: &str,
+        menu_page: MenuPage,
+        sysex: Option<OpenWareMidiSysexCommand>,
+    ) {
         if ui
             .add_enabled(self.menu_page != menu_page, egui::Button::new(label))
             .clicked()
         {
             self.menu_page = menu_page;
+            if let (Some(command), Some(connection)) = (sysex, &mut self.midi_output.connection) {
+                self.owl_command_processor
+                    .request_settings(connection, command)
+                    .unwrap();
+            }
         }
     }
     /*

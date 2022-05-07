@@ -84,6 +84,28 @@ impl OwlCommandProcessor {
             .unwrap_or_else(|_| println!("Error when sending SysEx ..."));
         Ok(())
     }
+    pub fn send_sysex_string(
+        &mut self,
+        connection: &mut MidiOutputConnection,
+        command: OpenWareMidiSysexCommand,
+        string: &[u8],
+    ) -> Result<(), Box<Error>> {
+        let mut data = vec![
+            owl_midi::MIDI_SYSEX_MANUFACTURER as u8,
+            owl_midi::MIDI_SYSEX_OMNI_DEVICE as u8,
+            command as u8,
+        ];
+        data.extend(string.iter());
+        let message = MidiMessage::SysEx(U7::try_from_bytes(&data).unwrap());
+        let mut msg_data = Vec::new();
+        msg_data.resize(message.bytes_size(), 0);
+        message.copy_to_slice(&mut msg_data).unwrap();
+        self.log += format!("> {:?} = {:?}\n", command, data).as_str();
+        connection
+            .send(&msg_data)
+            .unwrap_or_else(|_| println!("Error when sending SysEx ..."));
+        Ok(())
+    }
     /*
     pub fn send_cc(
         &mut self,
