@@ -14,6 +14,7 @@ pub struct OwlCommandProcessor {
     pub firmware_version: Option<String>,
     pub parameters: Vec<Option<OwlParameter>>,
     pub program_message: Option<String>,
+    pub error_message: Option<String>,
     pub patch_name: Option<String>,
     pub patch_names: Vec<String>,
     pub resource_offset: usize,
@@ -29,6 +30,7 @@ impl OwlCommandProcessor {
             firmware_version: None,
             parameters: Vec::new(),
             program_message: None,
+            error_message: None,
             patch_name: None,
             patch_names: Vec::new(),
             resource_offset: 0,
@@ -106,27 +108,27 @@ impl OwlCommandProcessor {
             .unwrap_or_else(|_| println!("Error when sending SysEx ..."));
         Ok(())
     }
-    /*
-    pub fn send_cc(
+
+    pub fn send_message(
         &mut self,
         connection: &mut MidiOutputConnection,
-        cc: u8,
-        value: u8,
+        message: MidiMessage<'_>,
     ) -> Result<(), Box<Error>> {
-        self.log += format!("> CC {cc}\n").as_str();
+        self.log += format!("> MIDI {:?}\n", message).as_str();
+        /*
         let message = MidiMessage::ControlChange(
             Channel::Ch1,
             ControlFunction::from(U7::try_from(cc).unwrap()),
             U7::try_from(value).unwrap(),
         );
+        */
         let mut msg_data = [0u8; 3];
         message.copy_to_slice(&mut msg_data).unwrap();
         connection
             .send(&msg_data)
-            .unwrap_or_else(|_| println!("Error when sending CC ..."));
+            .unwrap_or_else(|_| println!("Error when sending MIDI message ..."));
         Ok(())
     }
-    */
     pub fn handle_response(&mut self, data: &[u8], size: usize) -> Result<(), Error> {
         // TODO: use different error trait
         if data[1] == owl_midi::MIDI_SYSEX_MANUFACTURER as u8
@@ -221,8 +223,6 @@ impl OwlCommandProcessor {
                                         format!("! Error parsing {value_str} as hex\n").as_str();
                                     String::new()
                                 });
-
-                            //parse::<i32>().and_then(|x|x.to_string())
                             self.settings.insert(command, result);
                             self.log +=
                                 format!("< SYSEX_CONFIGURATION_COMMAND {:?}\n", command).as_str();

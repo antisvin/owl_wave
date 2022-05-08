@@ -20,7 +20,7 @@ use std::io::Cursor;
 use std::sync::Mutex;
 use std::{fs::File, sync::Arc};
 use wavetable::WavHandler;
-use wmidi::MidiMessage;
+use wmidi::{MidiMessage, U7};
 
 #[derive(PartialEq)]
 enum MenuPage {
@@ -545,16 +545,18 @@ impl eframe::App for OwlWaveApp {
                                         ..Default::default()
                                     },
                                 );
-                                /*
+                            }
+                            if let Some(error_message) =
+                                &self.owl_command_processor.error_message
+                            {
                                 job.append(
-                                    "or error message ",
+                                    format!("{error_message}\n").as_str(),
                                     0.0,
                                     egui::TextFormat {
                                         color: Color32::DARK_RED,
                                         ..Default::default()
                                     },
                                 );
-                                */
                             }
                             ui.label(job);
                         });
@@ -592,15 +594,50 @@ impl eframe::App for OwlWaveApp {
                             ui.vertical_centered(|ui| {
                                 ui.heading("Patches");
                             });
-                            egui::ScrollArea::vertical().show(ui, |ui| {
-                                for (i, patch) in self
-                                    .owl_command_processor
-                                    .patch_names
+                            ui.with_layout(
+                                egui::Layout::from_main_dir_and_cross_align(
+                                    egui::Direction::TopDown, egui::Align::Min).with_cross_justify(true),
+
+                                |ui| {
+                                    let patches = self.owl_command_processor.patch_names.clone();
+                                for (i, patch) in patches
                                     .iter()
                                     .skip(1)
-                                    .enumerate()
-                                {
-                                    ui.label(format!("{:>2}. {}", i + 1, patch));
+                                    .enumerate() {
+                                    let button_menu = |ui: &mut Ui| {
+                                        if ui.button("Load").clicked(){
+                                            self.send_cc(MidiMessage::ProgramChange(
+                                                        wmidi::Channel::Ch1,
+                                                        U7::try_from(1 + i as u8).unwrap()));
+                                            ui.close_menu();
+                                        };
+                                        /*
+                                        if ui.button("Download").clicked(){
+                                            ui.close_menu();
+                                        };
+                                        */
+                                        if ui.button("Delete").clicked(){
+                                            if let Some(connection) =
+                                            &mut self.midi_output.connection {
+                                                let mut sysex = [0u8; 5];
+                                                sysex[4] = i as u8 + 1;
+                                                self.owl_command_processor.send_sysex_string(
+                                                    connection,
+                                            OpenWareMidiSysexCommand::SYSEX_FLASH_ERASE,
+                                            &sysex
+                                                ).unwrap();
+                                        }
+
+                                            ui.close_menu();
+                                        };
+                                    };
+                                    if ui.button(format!("{:>2}. {}", i + 1, patch)).context_menu(button_menu).clicked(){
+                                        self.send_cc(MidiMessage::ProgramChange(
+                                            wmidi::Channel::Ch1,
+                                            U7::try_from(1 + i as u8).unwrap()));
+                                    };
+
+                                    //ui.button(format!("{:>2}. {}", i + 1, patch));
                                 }
                             });
                         }
@@ -898,5 +935,12 @@ impl OwlWaveApp {
             }
             ui.close_menu()
         };
+    }
+    fn send_cc(&mut self, message: MidiMessage<'_>) {
+        if let Some(connection) = &mut self.midi_output.connection {
+            self.owl_command_processor
+                .send_message(connection, message)
+                .unwrap();
+        }
     }
 }
