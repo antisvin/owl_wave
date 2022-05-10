@@ -15,7 +15,7 @@ use eframe::epaint::{Color32, FontId};
 use egui::plot::{Plot, Points, Value, Values};
 use egui::Ui;
 use itertools::{EitherOrBoth::Both, EitherOrBoth::Left, EitherOrBoth::Right, Itertools};
-use owl_midi::{OpenWareMidiSysexCommand, SYSEX_CONFIGURATIONS};
+use owl_midi::{OpenWareMidiSysexCommand, PatchParameterId, SYSEX_CONFIGURATIONS};
 use std::io::Cursor;
 use std::sync::Mutex;
 use std::{fs::File, sync::Arc};
@@ -592,6 +592,31 @@ impl eframe::App for OwlWaveApp {
                         MenuPage::Parameters => {
                             ui.vertical_centered(|ui| {
                                 ui.heading("Parameters");
+
+                                //ui.with_layout(
+                                //    egui::Layout::from_main_dir_and_cross_align(egui::Direction::TopDown, egui::Align::Min).with_cross_justify(true),
+                                egui::Grid::new("parameters-grid").show(
+                                    ui,
+                                    |ui| {
+                                        for i in 0..40 {
+                                            let pid = PatchParameterId::from(i);
+                                            if let Some(parameter) = self.owl_command_processor.parameters.get_mut(&pid) {
+                                                ui.label(pid.string_id());
+                                                ui.label(parameter.name.as_str());
+                                                ui.add(egui::Slider::new(&mut parameter.value, 0f32..=1f32));
+                                                ui.end_row()
+                                                //if ui.button(format!("{:2}. {}", pid.string_id(), parameter.name)).clicked(){
+                                                    /*
+                                                    self.send_cc(MidiMessage::ProgramChange(
+                                                        wmidi::Channel::Ch1,
+                                                        U7::try_from(1 + i as u8).unwrap()));
+                                                    };
+                                                     */
+                                                //}
+                                            }
+                                        }
+                                    }
+                                )
                             });
                         }
                         MenuPage::Patches => {

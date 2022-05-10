@@ -1735,9 +1735,9 @@ dependencies = [
 
 [[package]]
 name = "owl_midi"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b713a8e205a875d0096c7f36c0e07f83222600ca0df6cf5d9c4bc9b0e0b1742"
+checksum = "339bf587f30fcff3520b603666d5ad496f98d4f1f032ce9d462e8ad6d07c217d"
 dependencies = [
  "bindgen",
  "cty",
@@ -1748,7 +1748,7 @@ dependencies = [
 
 [[package]]
 name = "owl_wave"
-version = "0.3.12"
+version = "0.3.13"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -2154,9 +2154,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "syn"
-version = "1.0.92"
+version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ff7c592601f11445996a06f8ad0c27f094a58857c2f89e97974ab9235b92c52"
+checksum = "04066589568b72ec65f42d65a1a52436e954b168773148893c020269563decf2"
 dependencies = [
  "proc-macro2",
  "quote",
