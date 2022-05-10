@@ -1,6 +1,6 @@
 [package]
 name = "owl_wave"
-version = "0.3.11"
+version = "0.3.12"
 authors = ["Stas Shtin <antisvin@gmail.com>"]
 edition = "2021"
 rust-version = "1.60"
@@ -20,7 +20,7 @@ wavetable = { git = "https://github.com/icsga/Wavetable.git", version = "0.2.0",
 #basic_dsp = "0.9.4"
 rustfft = "5.0.0"
 rfd = "0.6.3"
-owl_midi = "0.3.3"
+owl_midi = "0.4.0"
 midir = "0.7.0"
 wmidi = "4.0.6"
 itertools = "0.10.3"

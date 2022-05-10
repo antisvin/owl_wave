@@ -1,5 +1,5 @@
 use crate::audio_devices::AudioHandler;
-use crate::owl_control::OwlCommandProcessor;
+use crate::owl_control::command_processor::OwlCommandProcessor;
 use crate::{
     grid::Grid,
     midi_devices::{MidiDeviceSelection, MidiInputHandle, MidiOutputHandle},
@@ -568,7 +568,7 @@ impl eframe::App for OwlWaveApp {
                         .width_range(80.0..=200.0)
                         .show_inside(ui, |ui| {
                             ui.vertical_centered_justified(|ui| {
-                                /*self.show_menu_page(ui, "Parameters", MenuPage::Parameters, None);*/
+                                self.show_menu_page(ui, "Parameters", MenuPage::Parameters, None);
                                 self.show_menu_page(ui, "Patches", MenuPage::Patches, Some(OpenWareMidiSysexCommand::SYSEX_PRESET_NAME_COMMAND));
                                 self.show_menu_page(ui, "Resources", MenuPage::Resources, Some(OpenWareMidiSysexCommand::SYSEX_RESOURCE_NAME_COMMAND));
                                 self.show_menu_page(ui, "Settings", MenuPage::Settings, Some(OpenWareMidiSysexCommand::SYSEX_CONFIGURATION_COMMAND));
@@ -589,15 +589,17 @@ impl eframe::App for OwlWaveApp {
                                 });
                         });
                     egui::CentralPanel::default().show_inside(ui, |ui| match self.menu_page {
-                        MenuPage::Parameters => {}
+                        MenuPage::Parameters => {
+                            ui.vertical_centered(|ui| {
+                                ui.heading("Parameters");
+                            });
+                        }
                         MenuPage::Patches => {
                             ui.vertical_centered(|ui| {
                                 ui.heading("Patches");
                             });
                             ui.with_layout(
-                                egui::Layout::from_main_dir_and_cross_align(
-                                    egui::Direction::TopDown, egui::Align::Min).with_cross_justify(true),
-
+                                egui::Layout::from_main_dir_and_cross_align(egui::Direction::TopDown, egui::Align::Min).with_cross_justify(true),
                                 |ui| {
                                     let patches = self.owl_command_processor.patch_names.clone();
                                 for (i, patch) in patches
@@ -750,7 +752,7 @@ impl eframe::App for OwlWaveApp {
                                 if let Ok(size) = message.copy_to_slice(buf.as_mut_slice()) {
                                     if size > 0 {
                                         if let Ok(_result) =
-                                            self.owl_command_processor.handle_response(&buf, size)
+                                            self.owl_command_processor.handle_sysex(&buf, size)
                                         {
                                             /*
                                             if let Some(output) = &self.owl_command_processor.output
@@ -762,6 +764,9 @@ impl eframe::App for OwlWaveApp {
                                         }
                                     }
                                 }
+                            }
+                            else {
+                                self.owl_command_processor.handle_midi_message(message)
                             }
                         }
                         data_guard.clear();
@@ -909,23 +914,6 @@ impl OwlWaveApp {
             }
         }
     }
-    /*
-    fn request_config_button(&mut self, ui: &mut Ui, label: &str) {
-        if ui.button(label).clicked() {
-            if let Some(connection) = &mut self.midi_output.connection {
-                self.owl_command_processor
-                    .send_cc(
-                        connection,
-                        OpenWareMidiControl::REQUEST_SETTINGS as u8,
-                        0x7f,
-                    )
-                    .unwrap();
-            }
-            self.menu_page = MenuPage::Settings;
-            ui.close_menu()
-        };
-    }
-    */
     fn send_sysex_button(&mut self, ui: &mut Ui, label: &str, sysex: OpenWareMidiSysexCommand) {
         if ui.button(label).clicked() {
             if let Some(connection) = &mut self.midi_output.connection {

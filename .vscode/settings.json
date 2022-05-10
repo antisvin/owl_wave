@@ -3,5 +3,6 @@
     "rust-analyzer.checkOnSave.command": "clippy",
     "rust-client.rustupPath": "/home/antisvin/.cargo/bin/rustup",
     "rust-client.engine": "rust-analyzer",
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "editor.inlayHints.enabled": "offUnlessPressed"
 }
