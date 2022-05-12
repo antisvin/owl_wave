@@ -1735,9 +1735,9 @@ dependencies = [
 
 [[package]]
 name = "owl_midi"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "339bf587f30fcff3520b603666d5ad496f98d4f1f032ce9d462e8ad6d07c217d"
+checksum = "c909211e6dcbd2c3a988ee24533d000e6d71e857d4cff029876777ca81611dec"
 dependencies = [
  "bindgen",
  "cty",
@@ -1748,7 +1748,7 @@ dependencies = [
 
 [[package]]
 name = "owl_wave"
-version = "0.3.13"
+version = "0.3.14"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",

@@ -15,7 +15,9 @@ use eframe::epaint::{Color32, FontId};
 use egui::plot::{Plot, Points, Value, Values};
 use egui::Ui;
 use itertools::{EitherOrBoth::Both, EitherOrBoth::Left, EitherOrBoth::Right, Itertools};
-use owl_midi::{OpenWareMidiSysexCommand, PatchParameterId, SYSEX_CONFIGURATIONS};
+use owl_midi::{
+    OpenWareMidiControl, OpenWareMidiSysexCommand, PatchParameterId, SYSEX_CONFIGURATIONS,
+};
 use std::io::Cursor;
 use std::sync::Mutex;
 use std::{fs::File, sync::Arc};
@@ -592,9 +594,6 @@ impl eframe::App for OwlWaveApp {
                         MenuPage::Parameters => {
                             ui.vertical_centered(|ui| {
                                 ui.heading("Parameters");
-
-                                //ui.with_layout(
-                                //    egui::Layout::from_main_dir_and_cross_align(egui::Direction::TopDown, egui::Align::Min).with_cross_justify(true),
                                 egui::Grid::new("parameters-grid").show(
                                     ui,
                                     |ui| {
@@ -604,20 +603,22 @@ impl eframe::App for OwlWaveApp {
                                                 ui.label(pid.string_id());
                                                 ui.label(parameter.name.as_str());
                                                 ui.add(egui::Slider::new(&mut parameter.value, 0f32..=1f32));
-                                                ui.end_row()
-                                                //if ui.button(format!("{:2}. {}", pid.string_id(), parameter.name)).clicked(){
-                                                    /*
-                                                    self.send_cc(MidiMessage::ProgramChange(
+                                                ui.end_row();
+                                                let sync = parameter.sync();
+                                                if sync {
+                                                    let cc = U7::try_from(OpenWareMidiControl::from(pid) as u8).unwrap();
+                                                    let cc_val = parameter.midi_value.try_into().unwrap();
+                                                    self.send_cc(MidiMessage::ControlChange(
                                                         wmidi::Channel::Ch1,
-                                                        U7::try_from(1 + i as u8).unwrap()));
-                                                    };
-                                                     */
-                                                //}
+                                                        wmidi::ControlFunction::from(cc),
+                                                        cc_val
+                                                    ));
+                                                };
                                             }
                                         }
-                                    }
-                                )
-                            });
+                                    });
+                                }
+                            );
                         }
                         MenuPage::Patches => {
                             ui.vertical_centered(|ui| {
@@ -650,11 +651,10 @@ impl eframe::App for OwlWaveApp {
                                                 sysex[4] = i as u8 + 1;
                                                 self.owl_command_processor.send_sysex_string(
                                                     connection,
-                                            OpenWareMidiSysexCommand::SYSEX_FLASH_ERASE,
-                                            &sysex
+                                                    OpenWareMidiSysexCommand::SYSEX_FLASH_ERASE,
+                                                    &sysex
                                                 ).unwrap();
-                                        }
-
+                                            }
                                             ui.close_menu();
                                         };
                                     };
@@ -713,11 +713,17 @@ impl eframe::App for OwlWaveApp {
                                                     if let Some(connection) =
                                                         &mut self.midi_output.connection
                                                     {
-                                                        let data = String::from_utf8([(config as isize >> 8) as u8,
-                                                            ((config as isize) & 0xff) as u8,].to_vec()).unwrap() + format!(
-                                                            "{:x}",
-                                                            parsed_value.unwrap()
-                                                        ).as_str();
+                                                        let parsed_int = parsed_value.unwrap();
+                                                        let parsed_str = if parsed_int >= 0 {
+                                                            format!("{:x}", parsed_int)
+                                                        }
+                                                        else {
+                                                            format!("-{:x}", -parsed_int)
+                                                        };
+                                                        let data = String::from_utf8(
+                                                            vec![(config as isize >> 8) as u8,
+                                                                 ((config as isize) & 0xff) as u8,]).unwrap() +
+                                                            parsed_str.as_str();
                                                         let sysex = data.as_bytes();
                                                         self.owl_command_processor
                                                             .send_sysex_string(
@@ -756,14 +762,14 @@ impl eframe::App for OwlWaveApp {
                                                         &mut self.midi_output.connection
                                                     {
                                                 self.owl_command_processor.send_sysex_command(
-                                                    connection, OpenWareMidiSysexCommand::SYSEX_SETTINGS_STORE).unwrap();
+                                                    connection, OpenWareMidiSysexCommand::SYSEX_SETTINGS_RESET).unwrap();
                                                     }
-
                                             }
                                     });
                                 });
                         }
                     });
+
                     //ui.horizontal(|ui|{});
                     if let Ok(mut data_guard) = self.midi_log.lock() {
                         //data_guard.iter(|| wmidi::MidiMessage::try_from().unwrap());
