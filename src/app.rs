@@ -598,7 +598,7 @@ impl eframe::App for OwlWaveApp {
                                     ui,
                                     |ui| {
                                         for i in 0..40 {
-                                            let pid = PatchParameterId::from(i);
+                                            let pid = PatchParameterId::try_from(i).unwrap();
                                             if let Some(parameter) = self.owl_command_processor.parameters.get_mut(&pid) {
                                                 ui.label(pid.string_id());
                                                 ui.label(parameter.name.as_str());

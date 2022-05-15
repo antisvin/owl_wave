@@ -249,7 +249,22 @@ impl OwlCommandProcessor {
     pub fn handle_midi_message(&mut self, midi_message: MidiMessage<'_>) {
         match midi_message {
             MidiMessage::ControlChange(_channel, function, value) => {
-                self.log += format!("< CC{} = {}\n", u8::from(function), u8::from(value)).as_str();
+                let cc = u8::from(function);
+                let value = u8::from(value);
+                //let control = OpenWareMidiControl::try_from(cc as isize);
+                if let Ok(pid) = PatchParameterId::try_from(cc as isize) {
+                    self.log += format!("< PARAMETER {:?} = {}", pid.string_id(), value).as_str();
+                    self.parameters
+                        .entry(pid)
+                        .and_modify(|p| p.midi_value = value)
+                        .or_insert_with(|| {
+                            let mut new_param = OwlParameter::new(pid.string_id().into());
+                            new_param.midi_value = value;
+                            new_param
+                        });
+                } else {
+                    self.log += format!("< CC{} = {}\n", cc, value).as_str();
+                }
             }
             _ => {
                 self.log += format!("< MIDI {midi_message:?}\n").as_str();
