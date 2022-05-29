@@ -111,7 +111,7 @@ impl SysexData for [u8] {
                 if cnt7 == 7 {
                     cnt7 = 0;
                     pos += 7;
-                    bitmask = u8::from(data[pos + 1]);
+                    bitmask = u8::from(c);
                 } else if cnt > 0 {
                     let msb = ((bitmask >> cnt7) & 1) << 7;
                     self[pos + cnt7] = msb | u8::from(c);
@@ -221,6 +221,16 @@ mod test {
         let mut result = [0; 32];
         assert_eq!(result.decode(data), Ok(CodingResult::new(11, 9)));
         assert_eq!(result[..9], [1, 2, 3, 4, 5, 6, 7, 128, 129]);
+
+        let data =
+            U7::try_from_bytes(&[0, 1, 2, 3, 4, 5, 6, 7, 1, 1, 2, 3, 4, 5, 6, 7, 2, 1, 2, 3])
+                .unwrap();
+        let mut result = [0; 32];
+        assert_eq!(result.decode(data), Ok(CodingResult::new(20, 17)));
+        assert_eq!(
+            result[..17],
+            [1, 2, 3, 4, 5, 6, 7, 129, 2, 3, 4, 5, 6, 7, 1, 130, 3]
+        );
     }
     #[test]
     fn test_encode_u8_slice() {
@@ -302,6 +312,16 @@ mod test {
         assert_eq!(result, CodingResult::new(9, 11));
         assert_eq!(
             U7::try_from_bytes(&[0, 1, 2, 3, 4, 5, 6, 7, 3, 0, 1]).unwrap(),
+            &buf[..result.bytes_written]
+        );
+
+        let data = [1, 2, 3, 4, 5, 6, 7, 129, 2, 3, 4, 5, 6, 7, 1, 130, 3].as_slice();
+        let buf = &mut [U7::MIN; 32];
+        let result = data.encode(buf.as_mut_slice()).unwrap();
+        assert_eq!(result, CodingResult::new(17, 20));
+        assert_eq!(
+            U7::try_from_bytes(&[0, 1, 2, 3, 4, 5, 6, 7, 1, 1, 2, 3, 4, 5, 6, 7, 2, 1, 2, 3])
+                .unwrap(),
             &buf[..result.bytes_written]
         );
     }
