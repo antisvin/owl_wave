@@ -1,6 +1,6 @@
 use wmidi::U7;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct CodingResult {
     pub bytes_read: usize,
     pub bytes_written: usize,

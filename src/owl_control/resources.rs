@@ -1,9 +1,9 @@
-use crate::owl_control::sysex::SysexData;
+use crate::owl_control::{crc32::Crc32, sysex::SysexData};
 use anyhow::Result;
 use byte_unit::Byte;
 use wmidi::U7;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Resource {
     pub id: u8,
     pub name: String,
@@ -27,15 +27,16 @@ impl Resource {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ResourceState {
     New,
     InProgress,
     Complete,
     Failed,
+    InvalidChecksum,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ResourceData {
     pub state: ResourceState,
     pub data: Vec<u8>,
@@ -95,7 +96,15 @@ impl ResourceData {
                 if data.len() == 5 {
                     if let Ok(_result) = self.checksum.decode(data) {
                         self.state = ResourceState::New;
-                        println!("CS = {:x}", self.checksum);
+                        let crc = Crc32::new().update(&self.data[..self.size as usize]).crc;
+                        if crc != self.checksum {
+                            self.state = ResourceState::InvalidChecksum;
+                        }
+                        println!(
+                            "{} {} {} {}",
+                            self.data[0], self.data[1], self.data[2], self.data[3]
+                        );
+                        println!("CS = {:x} / {:x}", self.checksum, crc);
                     } else {
                         self.state = ResourceState::Failed;
                     }

@@ -18,13 +18,14 @@ use itertools::{EitherOrBoth::Both, EitherOrBoth::Left, EitherOrBoth::Right, Ite
 use owl_midi::{
     OpenWareMidiControl, OpenWareMidiSysexCommand, PatchParameterId, SYSEX_CONFIGURATIONS,
 };
+use std::fmt::Write;
 use std::io::Cursor;
 use std::sync::Mutex;
 use std::{fs::File, sync::Arc};
 use wavetable::WavHandler;
 use wmidi::{MidiMessage, U7};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 enum MenuPage {
     Parameters,
     Patches,
@@ -898,9 +899,9 @@ impl OwlWaveApp {
             let mut text = "Dropping files:\n".to_owned();
             for file in &ctx.input().raw.hovered_files {
                 if let Some(path) = &file.path {
-                    text += &format!("\n{}", path.display());
+                    let _ = write!(text, "\n{}", path.display());
                 } else if !file.mime.is_empty() {
-                    text += &format!("\n{}", file.mime);
+                    let _ = write!(text, "\n{}", file.mime);
                 } else {
                     text += "\n???";
                 }
@@ -942,7 +943,7 @@ impl OwlWaveApp {
                         }
                     }
                 } else if let Some(bytes) = &file.bytes {
-                    info += &format!(" ({} bytes)", bytes.len());
+                    let _ = write!(info, " ({} bytes)", bytes.len());
                     let reader = Cursor::new(bytes);
                     if let Ok(wav_content) = WavHandler::read_content(reader) {
                         self.grid.load_waves(&wav_content).unwrap_or(0);
