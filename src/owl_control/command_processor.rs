@@ -1,9 +1,14 @@
+use anyhow::Error;
 use midir::MidiOutputConnection;
 use owl_midi::{OpenWareMidiSysexCommand, PatchParameterId, SysexConfiguration};
 use std::collections::HashMap;
-use wmidi::{Channel, ControlFunction, Error, MidiMessage, U7};
+use wmidi::{Channel, ControlFunction, MidiMessage, U7};
 
-use super::parameter::OwlParameter;
+use super::{
+    parameter::OwlParameter,
+    resources::{Resource, ResourceData},
+    sysex::SysexData,
+};
 
 pub struct OwlCommandProcessor {
     pub firmware_version: Option<String>,
@@ -11,12 +16,13 @@ pub struct OwlCommandProcessor {
     pub program_message: Option<String>,
     pub error_message: Option<String>,
     pub patch_name: Option<String>,
-    pub patch_names: Vec<String>,
+    pub patches: Vec<Option<Resource>>,
     pub resource_offset: usize,
-    pub resource_names: Vec<String>,
+    pub resources: Vec<Option<Resource>>,
     pub program_stats: Option<String>,
     pub settings: HashMap<SysexConfiguration, String>,
     pub log: String,
+    pub resource_data: ResourceData,
 }
 
 impl OwlCommandProcessor {
@@ -27,12 +33,13 @@ impl OwlCommandProcessor {
             program_message: None,
             error_message: None,
             patch_name: None,
-            patch_names: Vec::new(),
+            patches: Vec::new(),
             resource_offset: 0,
-            resource_names: Vec::new(),
+            resources: Vec::new(),
             program_stats: None,
             settings: HashMap::new(),
             log: String::new(),
+            resource_data: ResourceData::new(),
         }
     }
     pub fn request_settings(
@@ -52,10 +59,10 @@ impl OwlCommandProcessor {
         let mut msg_data = [0u8; 3];
         message.copy_to_slice(&mut msg_data).unwrap();
         if command == OpenWareMidiSysexCommand::SYSEX_PRESET_NAME_COMMAND {
-            self.patch_names.clear()
+            self.patches.clear()
         } else if command == OpenWareMidiSysexCommand::SYSEX_RESOURCE_NAME_COMMAND {
             self.resource_offset = 0;
-            self.resource_names.clear()
+            self.resources.clear()
         }
         connection
             .send(&msg_data)
@@ -127,109 +134,134 @@ impl OwlCommandProcessor {
             .unwrap_or_else(|_| println!("Error when sending MIDI message ..."));
         Ok(())
     }
-    pub fn handle_sysex(&mut self, data: &[u8], size: usize) -> Result<(), Error> {
+    pub fn handle_sysex(&mut self, data: &[U7]) -> Result<(), Error> {
         // TODO: use different error trait
-        if data[1] == owl_midi::MIDI_SYSEX_MANUFACTURER as u8
-            && data[2] == owl_midi::MIDI_SYSEX_OWL_DEVICE as u8
+        if u8::from(data[0]) as u32 == owl_midi::MIDI_SYSEX_MANUFACTURER
+            && u8::from(data[1]) as u32 == owl_midi::MIDI_SYSEX_OWL_DEVICE
         {
             if let Some(cmd) = data
-                .get(3)
-                .and_then(|&x| OpenWareMidiSysexCommand::try_from(x as isize).ok())
+                .get(2)
+                .and_then(|&x| OpenWareMidiSysexCommand::try_from(u8::from(x) as isize).ok())
             {
-                return self.handle_sysex_command(cmd, data, size);
+                return self.handle_sysex_command(cmd, &data[3..]);
             }
+            // TODO: handle unknown commands here
         }
         Ok(())
     }
     fn handle_sysex_command(
         &mut self,
         cmd: OpenWareMidiSysexCommand,
-        data: &[u8],
-        size: usize,
+        data: &[U7],
     ) -> Result<(), Error> {
+        let size = data.len();
         match cmd {
             OpenWareMidiSysexCommand::SYSEX_FIRMWARE_VERSION => {
-                let firmware_version = String::from_utf8_lossy(&data[4..size - 1]);
+                let firmware_version = String::from_utf8_lossy(U7::data_to_bytes(data));
                 self.firmware_version = Some(firmware_version.to_string());
                 self.log += format!("< SYSEX_FIRMWARE_VERSION = {firmware_version}\n").as_str();
             }
             OpenWareMidiSysexCommand::SYSEX_PARAMETER_NAME_COMMAND => {
-                let pid = PatchParameterId::try_from(data[4] as isize).unwrap();
-                let parameter_name = String::from_utf8_lossy(&data[5..size - 1]).to_string();
-                self.log +=
-                    format!("< SYSEX_PARAMETER_NAME_COMMAND {pid:?}: {parameter_name}\n").as_str();
+                let param = PatchParameterId::try_from(u8::from(data[0]) as isize).unwrap();
+                let parameter_name =
+                    String::from_utf8_lossy(U7::data_to_bytes(&data[1..size - 1])).to_string();
+                self.log += format!("< SYSEX_PARAMETER_NAME_COMMAND {param:?}: {parameter_name}\n")
+                    .as_str();
                 self.parameters
-                    .insert(pid, OwlParameter::new(parameter_name));
+                    .insert(param, OwlParameter::new(parameter_name));
                 //self.parameters.insert(k, v)
             }
             OpenWareMidiSysexCommand::SYSEX_PRESET_NAME_COMMAND => {
-                let pos = data[4] as usize;
-                if pos >= self.patch_names.len() {
-                    self.patch_names.resize(pos + 1, String::new());
+                let pos: usize = u8::from(data[0]).into();
+                if pos >= self.patches.len() {
+                    self.patches.resize_with(pos + 1, || None);
                 }
 
                 let mut end = size - 1;
-                for (i, item) in data.iter().enumerate().take(size - 1).skip(6) {
-                    if *item == 0 {
+                for (i, item) in data.iter().enumerate().take(size - 1).skip(1) {
+                    if *item == U7::MIN {
                         end = i;
                         break;
                     }
                 }
-                self.patch_names[pos] = String::from_utf8_lossy(&data[5..end]).to_string();
-                if !self.patch_names.is_empty() {
-                    self.patch_name = Some(self.patch_names[0].clone());
+                let mut patch_size = 0;
+                patch_size.decode(&data[end + 1..end + 6]).unwrap();
+                let mut checksum = 0;
+                checksum.decode(&data[end + 6..end + 11]).unwrap();
+                self.patches[pos] = Some(Resource::new(
+                    pos as u8,
+                    String::from_utf8_lossy(U7::data_to_bytes(&data[1..end])).to_string(),
+                    patch_size,
+                    checksum,
+                ));
+                if !self.patches.is_empty() {
+                    if let Some(patch) = &self.patches[0] {
+                        self.patch_name = Some(patch.name.clone());
+                    } else {
+                        self.patch_name = None
+                    }
                 }
                 self.log += format!(
                     "< SYSEX_PATCH_NAME_COMMAND {pos} = {}\n",
-                    self.patch_names[pos]
+                    self.patches[pos].as_ref().unwrap().name
                 )
                 .as_str();
             }
             OpenWareMidiSysexCommand::SYSEX_RESOURCE_NAME_COMMAND => {
-                let mut pos = data[4] as usize;
-                if self.resource_names.is_empty() {
+                let mut pos: usize = u8::from(data[0]).into();
+                if self.resources.is_empty() {
                     self.resource_offset = pos;
                 }
                 pos -= self.resource_offset;
-                if pos >= self.resource_names.len() {
-                    self.resource_names.resize(pos + 1, String::new());
+                if pos >= self.resources.len() {
+                    self.resources.resize_with(pos + 1, || None);
                 }
 
                 let mut end = size - 1;
-                for (i, item) in data.iter().enumerate().take(size - 1).skip(6) {
-                    if *item == 0 {
+                for (i, item) in data.iter().enumerate().take(size - 1).skip(1) {
+                    if *item == wmidi::U7::MIN {
                         end = i;
                         break;
                     }
                 }
-                self.resource_names[pos] = String::from_utf8_lossy(&data[5..end]).to_string();
+                let mut resource_size = 0;
+                resource_size.decode(&data[end + 1..end + 6]).unwrap();
+                let mut checksum = 0;
+                checksum.decode(&data[end + 6..end + 11]).unwrap();
+                self.resources[pos] = Some(Resource::new(
+                    pos as u8,
+                    String::from_utf8_lossy(U7::data_to_bytes(&data[1..end])).to_string(),
+                    resource_size,
+                    checksum,
+                ));
                 self.log += format!(
                     "< SYSEX_RESOURCE_NAME_COMMAND {pos} = {}\n",
-                    self.resource_names[pos]
+                    self.resources[pos].as_ref().unwrap().name
                 )
                 .as_str();
             }
             OpenWareMidiSysexCommand::SYSEX_PROGRAM_MESSAGE => {
-                let program_message = String::from_utf8_lossy(&data[4..size - 1]);
+                let program_message = String::from_utf8_lossy(U7::data_to_bytes(&data[..size - 1]));
                 self.program_message = Some(program_message.to_string());
                 self.log += format!("< SYSEX_PROGRAM_MESSAGE = {program_message}\n").as_str();
             }
             OpenWareMidiSysexCommand::SYSEX_PROGRAM_ERROR => {
-                let error_message = String::from_utf8_lossy(&data[4..size - 1]);
+                let error_message = String::from_utf8_lossy(U7::data_to_bytes(&data[..size - 1]));
                 self.error_message = Some(error_message.to_string());
                 self.log += format!("< SYSEX_PROGRAM_ERROR = {error_message}\n").as_str();
             }
             OpenWareMidiSysexCommand::SYSEX_PROGRAM_STATS => {
-                let stats = String::from_utf8_lossy(&data[4..size - 1]);
+                let stats = String::from_utf8_lossy(U7::data_to_bytes(&data[..size - 1]));
                 self.program_stats = Some(stats.to_string());
                 self.log += format!("< SYSEX_PROGRAM_STATS {stats}\n").as_str();
             }
             //cmd if OpenWareMidiSysexCommand::SYSEX_PARAMETER_NAME_COMMAND as u8 == cmd => {
             //}
             OpenWareMidiSysexCommand::SYSEX_CONFIGURATION_COMMAND => {
-                let command_int = (data[4] as isize) << 8 | data[5] as isize;
+                let command_int = (u8::from(data[0]) as isize) << 8 | u8::from(data[1]) as isize;
                 let command = SysexConfiguration::from(command_int);
-                let value_str = String::from_utf8_lossy(&data[6..size - 1]).to_string();
+                let value_str =
+                    String::from_utf8_lossy(U7::data_to_bytes(&data[2..size])).to_string();
                 println!("{:?} = {}", command, value_str);
                 let result = i64::from_str_radix(value_str.as_str(), 16)
                     .map(|x| x.to_string())
@@ -239,6 +271,18 @@ impl OwlCommandProcessor {
                     });
                 self.settings.insert(command, result);
                 self.log += format!("< SYSEX_CONFIGURATION_COMMAND {:?}\n", command).as_str();
+            }
+            OpenWareMidiSysexCommand::SYSEX_FIRMWARE_UPLOAD => {
+                let mut idx = 0;
+                if let Ok(_result) = idx.decode(data) {
+                    if idx == 0 {
+                        self.resource_data.reset();
+                    }
+                    self.log += format!("< SYSEX_FIRMWARE_UPLOAD #{idx}\n").as_str();
+                    //idx.decode(&data[4..9]).unwrap();
+                    //let decoded = SysexData::decode(&data[9..size - 1]).unwrap();
+                    self.resource_data.process_data(&data[5..])?
+                }
             }
             _ => {
                 println!("Unhandled command: {cmd:?}")
@@ -253,7 +297,7 @@ impl OwlCommandProcessor {
                 let value = u8::from(value);
                 //let control = OpenWareMidiControl::try_from(cc as isize);
                 if let Ok(pid) = PatchParameterId::try_from(cc as isize) {
-                    self.log += format!("< PARAMETER {:?} = {}", pid.string_id(), value).as_str();
+                    self.log += format!("< PARAMETER {:?} = {}\n", pid.string_id(), value).as_str();
                     self.parameters
                         .entry(pid)
                         .and_modify(|p| p.midi_value = value)

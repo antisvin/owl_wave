@@ -624,61 +624,122 @@ impl eframe::App for OwlWaveApp {
                             ui.vertical_centered(|ui| {
                                 ui.heading("Patches");
                             });
-                            ui.with_layout(
-                                egui::Layout::from_main_dir_and_cross_align(egui::Direction::TopDown, egui::Align::Min).with_cross_justify(true),
-                                |ui| {
-                                    let patches = self.owl_command_processor.patch_names.clone();
-                                for (i, patch) in patches
+                            egui::Grid::new("patches-grid").show(
+                                ui,
+                                |ui|
+                                for (i, maybe_patch) in self.owl_command_processor.patches
+                                    .clone()
                                     .iter()
                                     .skip(1)
                                     .enumerate() {
-                                    let button_menu = |ui: &mut Ui| {
-                                        if ui.button("Load").clicked(){
+                                    if let Some(patch) = maybe_patch {
+                                        let button_menu = |ui: &mut Ui| {
+                                            if ui.button("Load").clicked(){
+                                                self.send_cc(MidiMessage::ProgramChange(
+                                                            wmidi::Channel::Ch1,
+                                                            U7::try_from(1 + i as u8).unwrap()));
+                                                ui.close_menu();
+                                            };
+                                            /*
+                                            if ui.button("Download").clicked(){
+                                                ui.close_menu();
+                                            };
+                                            */
+                                            if ui.button("Delete").clicked(){
+                                                if let Some(connection) =
+                                                &mut self.midi_output.connection {
+                                                    let mut sysex = [0u8; 5];
+                                                    sysex[4] = i as u8 + 1;
+                                                    self.owl_command_processor.send_sysex_string(
+                                                        connection,
+                                                        OpenWareMidiSysexCommand::SYSEX_FLASH_ERASE,
+                                                        &sysex
+                                                    ).unwrap();
+                                                }
+                                                ui.close_menu();
+                                            };
+                                        };
+                                        let button = egui::Button::new(format!("{:>2}. {}", i + 1, patch.name));
+                                        let layout = egui::Layout::from_main_dir_and_cross_align(egui::Direction::TopDown, egui::Align::Min).with_cross_justify(true);
+                                        if ui.allocate_ui_with_layout(egui::Vec2::new(400.0, 20.0), layout, |ui| ui.add(button))
+                                            .inner.context_menu(button_menu).clicked() {
                                             self.send_cc(MidiMessage::ProgramChange(
-                                                        wmidi::Channel::Ch1,
-                                                        U7::try_from(1 + i as u8).unwrap()));
-                                            ui.close_menu();
+                                                wmidi::Channel::Ch1,
+                                                U7::try_from(1 + i as u8).unwrap()));
                                         };
-                                        /*
-                                        if ui.button("Download").clicked(){
-                                            ui.close_menu();
-                                        };
-                                        */
-                                        if ui.button("Delete").clicked(){
-                                            if let Some(connection) =
-                                            &mut self.midi_output.connection {
-                                                let mut sysex = [0u8; 5];
-                                                sysex[4] = i as u8 + 1;
-                                                self.owl_command_processor.send_sysex_string(
-                                                    connection,
-                                                    OpenWareMidiSysexCommand::SYSEX_FLASH_ERASE,
-                                                    &sysex
-                                                ).unwrap();
-                                            }
-                                            ui.close_menu();
-                                        };
-                                    };
-                                    if ui.button(format!("{:>2}. {}", i + 1, patch)).context_menu(button_menu).clicked(){
-                                        self.send_cc(MidiMessage::ProgramChange(
-                                            wmidi::Channel::Ch1,
-                                            U7::try_from(1 + i as u8).unwrap()));
-                                    };
-
-                                    //ui.button(format!("{:>2}. {}", i + 1, patch));
+                                        ui.label(format!("{:X}", patch.checksum).as_str());
+                                        ui.label(patch.size_string().as_str());
+                                    }
+                                    else {
+                                        ui.separator();
+                                    }
+                                    ui.end_row()
                                 }
-                            });
+                            );
                         }
                         MenuPage::Resources => {
                             ui.vertical_centered(|ui| {
                                 ui.heading("Resources");
                             });
-                            egui::ScrollArea::vertical().show(ui, |ui| {
-                                for (i, patch) in
-                                    self.owl_command_processor.resource_names.iter().enumerate()
+
+                            egui::Grid::new("patches-grid").show(
+                                ui,
+                                |ui|
                                 {
-                                    ui.label(format!("{:>2}. {}", i + 1, patch));
+                                    for (i, maybe_resource) in self.owl_command_processor.resources.clone().iter().enumerate() {
+                                        if let Some(resource) = maybe_resource {
+                                        let button_menu = |ui: &mut Ui| {
+                                            if ui.button("Load wavetable").clicked(){
+                                                if let Some(connection) = &mut self.midi_output.connection {
+                                                    let mut sysex = [0u8; 5];
+                                                    sysex[4] = (i + self.owl_command_processor.resource_offset) as u8 + 1;
+                                                    self.owl_command_processor.send_sysex_string(
+                                                        connection,
+                                                        OpenWareMidiSysexCommand::SYSEX_FIRMWARE_SEND,
+                                                        &sysex
+                                                    ).unwrap();
+                                                }
+                                                ui.close_menu();
+                                            };
+                                            /*
+                                            if ui.button("Download").clicked(){
+                                                ui.close_menu();
+                                            };
+                                            */
+                                            if ui.button("Delete").clicked(){
+                                                /*
+                                                if let Some(connection) =
+                                                &mut self.midi_output.connection {
+                                                    let mut sysex = [0u8; 5];
+                                                    sysex[4] = i as u8 + 1;
+                                                    self.owl_command_processor.send_sysex_string(
+                                                        connection,
+                                                        OpenWareMidiSysexCommand::SYSEX_FLASH_ERASE,
+                                                        &sysex
+                                                    ).unwrap();
+                                                }
+                                                 */
+                                                ui.close_menu();
+                                            };
+                                        };
+                                        let button = egui::Button::new(format!("{:>2}. {}", i + 1, resource.name));
+                                        let layout = egui::Layout::from_main_dir_and_cross_align(egui::Direction::TopDown, egui::Align::Min).with_cross_justify(true);
+                                        if ui.allocate_ui_with_layout(egui::Vec2::new(400.0, 20.0), layout, |ui| ui.add(button))
+                                            .inner.context_menu(button_menu).clicked() {
+                                            /*
+                                            self.send_cc(MidiMessage::ProgramChange(
+                                                wmidi::Channel::Ch1,
+                                                U7::try_from(1 + i as u8).unwrap()));
+                                                 */
+                                        };
+                                        ui.label(format!("{:X}", resource.checksum).as_str());
+                                        ui.label(resource.size_string().as_str());
+                                    }
+                                    else {ui.separator();}
+                                    ui.end_row()
+                                    }
                                 }
-                            });
+                            );
                         }
                         MenuPage::Settings => {
                             ui.vertical_centered(|ui| {
@@ -778,7 +839,9 @@ impl eframe::App for OwlWaveApp {
                         while start < bytes.len() {
                             let message = wmidi::MidiMessage::try_from(&bytes[start..]).unwrap();
                             start += message.bytes_size();
-                            if let MidiMessage::SysEx(_data) = message {
+                            if let MidiMessage::SysEx(data) = message {
+                                self.owl_command_processor.handle_sysex(data).expect("Error handling sysex");
+                                /*
                                 let mut buf: [u8; 256] = [0; 256];
                                 if let Ok(size) = message.copy_to_slice(buf.as_mut_slice()) {
                                     if size > 0 {
@@ -795,6 +858,7 @@ impl eframe::App for OwlWaveApp {
                                         }
                                     }
                                 }
+                                */
                             }
                             else {
                                 self.owl_command_processor.handle_midi_message(message)
