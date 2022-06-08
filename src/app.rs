@@ -1,5 +1,6 @@
 use crate::audio_devices::AudioHandler;
 use crate::owl_control::command_processor::OwlCommandProcessor;
+use crate::owl_control::resources::ResourceState;
 use crate::{
     grid::Grid,
     midi_devices::{MidiDeviceSelection, MidiInputHandle, MidiOutputHandle},
@@ -113,7 +114,13 @@ impl eframe::App for OwlWaveApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        //let Self { label, grid } = self;
+        if self.owl_command_processor.resource_data.state == ResourceState::Success {
+            let data = &self.owl_command_processor.resource_data.data;
+            let reader = Cursor::new(data);
+            if let Ok(wav_content) = WavHandler::read_content(reader) {
+                self.grid.load_waves(&wav_content).unwrap_or(0);
+            }
+        };
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:

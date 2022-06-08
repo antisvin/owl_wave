@@ -32,6 +32,7 @@ pub enum ResourceState {
     New,
     InProgress,
     Complete,
+    Success,
     Failed,
     InvalidChecksum,
 }
@@ -99,12 +100,9 @@ impl ResourceData {
                         let crc = Crc32::new().update(&self.data[..self.size as usize]).crc;
                         if crc != self.checksum {
                             self.state = ResourceState::InvalidChecksum;
+                        } else {
+                            self.state = ResourceState::Success;
                         }
-                        println!(
-                            "{} {} {} {}",
-                            self.data[0], self.data[1], self.data[2], self.data[3]
-                        );
-                        println!("CS = {:x} / {:x}", self.checksum, crc);
                     } else {
                         self.state = ResourceState::Failed;
                     }
