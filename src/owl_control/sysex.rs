@@ -136,7 +136,7 @@ impl SysexData for [u8] {
                 cnt7 = 0;
             }
             buf[pos + cnt7 + 1] = U7::from_u8_lossy(char);
-            let msb = (char >> 7) as u8;
+            let msb = char >> 7;
             if msb > 0 {
                 bitmask |= msb << cnt7;
                 buf[pos] = U7::from_u8_lossy(bitmask);

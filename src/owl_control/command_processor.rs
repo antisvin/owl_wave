@@ -47,7 +47,7 @@ impl OwlCommandProcessor {
         connection: &mut MidiOutputConnection,
         command: OpenWareMidiSysexCommand,
     ) -> Result<(), Box<Error>> {
-        self.log += format!("> {:?}\n", command).as_str();
+        self.log += format!("> {command:?}\n").as_str();
         let chan = Channel::from_index(0).unwrap();
         let message = MidiMessage::ControlChange(
             chan,
@@ -74,7 +74,7 @@ impl OwlCommandProcessor {
         connection: &mut MidiOutputConnection,
         command: OpenWareMidiSysexCommand,
     ) -> Result<(), Box<Error>> {
-        self.log += format!("> {:?}\n", command).as_str();
+        self.log += format!("> {command:?}\n").as_str();
         let data = [
             owl_midi::MIDI_SYSEX_MANUFACTURER as u8,
             owl_midi::MIDI_SYSEX_OMNI_DEVICE as u8,
@@ -104,7 +104,7 @@ impl OwlCommandProcessor {
         let mut msg_data = Vec::new();
         msg_data.resize(message.bytes_size(), 0);
         message.copy_to_slice(&mut msg_data).unwrap();
-        self.log += format!("> {:?} = {:?}\n", command, data).as_str();
+        self.log += format!("> {command:?} = {data:?}\n").as_str();
         connection
             .send(&msg_data)
             .unwrap_or_else(|_| println!("Error when sending SysEx ..."));
@@ -116,7 +116,7 @@ impl OwlCommandProcessor {
         connection: &mut MidiOutputConnection,
         message: MidiMessage<'_>,
     ) -> Result<(), Box<Error>> {
-        self.log += format!("> MIDI {:?}\n", message).as_str();
+        self.log += format!("> MIDI {message:?}\n").as_str();
         if let MidiMessage::ProgramChange(_, _) = message {
             self.parameters.clear();
         }
@@ -262,7 +262,7 @@ impl OwlCommandProcessor {
                 let command = SysexConfiguration::from(command_int);
                 let value_str =
                     String::from_utf8_lossy(U7::data_to_bytes(&data[2..size])).to_string();
-                println!("{:?} = {}", command, value_str);
+                println!("{command:?} = {value_str}");
                 let result = i64::from_str_radix(value_str.as_str(), 16)
                     .map(|x| x.to_string())
                     .unwrap_or_else(|_err| {
@@ -270,7 +270,7 @@ impl OwlCommandProcessor {
                         String::new()
                     });
                 self.settings.insert(command, result);
-                self.log += format!("< SYSEX_CONFIGURATION_COMMAND {:?}\n", command).as_str();
+                self.log += format!("< SYSEX_CONFIGURATION_COMMAND {command:?}\n").as_str();
             }
             OpenWareMidiSysexCommand::SYSEX_FIRMWARE_UPLOAD => {
                 let mut idx = 0;
@@ -307,7 +307,7 @@ impl OwlCommandProcessor {
                             new_param
                         });
                 } else {
-                    self.log += format!("< CC{} = {}\n", cc, value).as_str();
+                    self.log += format!("< CC{cc} = {value}\n").as_str();
                 }
             }
             _ => {

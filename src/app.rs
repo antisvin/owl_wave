@@ -13,7 +13,7 @@ use eframe::egui::{
 };
 use eframe::epaint::text::LayoutJob;
 use eframe::epaint::{Color32, FontId};
-use egui::plot::{Plot, Points, Value, Values};
+use egui::plot::{Plot, Points};
 use egui::Ui;
 use itertools::{EitherOrBoth::Both, EitherOrBoth::Left, EitherOrBoth::Right, Itertools};
 use owl_midi::{
@@ -140,8 +140,9 @@ impl eframe::App for OwlWaveApp {
                         }
                     }
 
+                    #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
                     if ui.button("Quit").clicked() {
-                        frame.quit();
+                        frame.close();
                     }
                 });
                 ui.menu_button("Help", |ui| {
@@ -154,7 +155,7 @@ impl eframe::App for OwlWaveApp {
         egui::Window::new("about")
             .open(&mut self.show_about)
             .show(ctx, |ui| {
-                ui.label(format!("Version: {}", VERSION));
+                ui.label(format!("Version: {VERSION}"));
             });
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
@@ -164,14 +165,14 @@ impl eframe::App for OwlWaveApp {
                 for i in 0..self.grid.get_waves() {
                     //ui.label(i.to_string());
                     let samples = self.grid.get_samples() as f64;
-                    let points = Points::new(Values::from_values(
+                    let points = Points::new(
                         self.grid
                             .get_wave_by_id(i)
                             .iter()
                             .enumerate()
-                            .map(|(i, &v)| Value::new(i as f64 / samples, v))
-                            .collect(),
-                    ))
+                            .map(|(i, &v)| [i as f64 / samples, v])
+                            .collect::<Vec<_>>(),
+                    )
                     .stems(-1.5)
                     .radius(1.0);
                     //ui.points(points.name("Points with stems"));
@@ -205,14 +206,14 @@ impl eframe::App for OwlWaveApp {
         egui::Window::new("Wavetable").show(ctx, |ui| {
             ui.vertical(|ui| {
                 let samples = self.grid.get_samples();
-                let points = Points::new(Values::from_values(
+                let points = Points::new(
                     self.grid
                         .get_wave_by_id(self.active_wave_id)
                         .iter()
                         .enumerate()
-                        .map(|(i, &v)| Value::new(i as f64 / samples as f64, v))
-                        .collect(),
-                ))
+                        .map(|(i, &v)| [i as f64 / samples as f64, v])
+                        .collect::<Vec<_>>(),
+                )
                 .stems(-1.5)
                 .radius(1.0);
                 let plot = Plot::new("wavetable-main")
@@ -252,14 +253,14 @@ impl eframe::App for OwlWaveApp {
                 let mut wave_id = 0;
                 for i in 0..self.grid.get_rows() {
                     for j in 0..self.grid.get_cols() {
-                        let points = Points::new(Values::from_values(
+                        let points = Points::new(
                             self.grid
                                 .get_wave_by_id(wave_id)
                                 .iter()
                                 .enumerate()
-                                .map(|(i, &v)| Value::new(i as f64 / samples, v))
-                                .collect(),
-                        ))
+                                .map(|(i, &v)| [i as f64 / samples, v])
+                                .collect::<Vec<_>>(),
+                        )
                         .stems(-1.5)
                         .radius(1.0);
                         //ui.points(points.name("Points with stems"));
@@ -294,7 +295,7 @@ impl eframe::App for OwlWaveApp {
                     if num_hosts == 1 {
                         label += "1 host";
                     } else {
-                        label += format!("{} hosts", num_hosts).as_str();
+                        label += format!("{num_hosts} hosts").as_str();
                     }
                     ui.label(label);
                 });
@@ -776,7 +777,7 @@ impl eframe::App for OwlWaveApp {
                                                     .unwrap_or(false);
                                                 let button = ui.add_enabled(
                                                     valid_value,
-                                                    egui::Button::new(format!("{:?}", config)),
+                                                    egui::Button::new(format!("{config:?}")),
                                                 );
                                                 if valid_value && button.clicked() {
                                                     if let Some(connection) =
@@ -784,7 +785,7 @@ impl eframe::App for OwlWaveApp {
                                                     {
                                                         let parsed_int = parsed_value.unwrap();
                                                         let parsed_str = if parsed_int >= 0 {
-                                                            format!("{:x}", parsed_int)
+                                                            format!("{parsed_int:x}")
                                                         }
                                                         else {
                                                             format!("-{:x}", -parsed_int)
@@ -885,12 +886,13 @@ impl eframe::App for OwlWaveApp {
 impl OwlWaveApp {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        /*
         if cc.integration_info.prefer_dark_mode == Some(false) {
             cc.egui_ctx.set_visuals(egui::Visuals::light()); // use light mode if explicitly asked for
         } else {
             cc.egui_ctx.set_visuals(egui::Visuals::dark()); // use dark mode if there is no preference, or the preference is dark mode
         }
-
+        */
         // Load previous app state (if any).
         if let Some(storage) = cc.storage {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();

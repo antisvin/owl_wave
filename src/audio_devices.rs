@@ -128,7 +128,7 @@ impl AudioHandler {
             (sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sample_rate).sin()
         };
 
-        let err_fn = |err| print!("an error occurred on stream: {}", err);
+        let err_fn = |err| print!("an error occurred on stream: {err}");
 
         let stream = device
             .build_output_stream(
