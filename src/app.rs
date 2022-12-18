@@ -812,8 +812,8 @@ impl eframe::App for OwlWaveApp {
                                                 self.owl_command_processor
                                                     .settings
                                                     .entry(config)
-                                                    .or_insert(String::new()),
-                                            )
+                                                    .or_default()
+                                                )
                                             .hint_text("Edit value"),
                                         );
                                         ui.end_row()
