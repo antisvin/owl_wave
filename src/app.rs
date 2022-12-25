@@ -502,6 +502,11 @@ impl eframe::App for OwlWaveApp {
                                         "Reset",
                                         OpenWareMidiSysexCommand::SYSEX_DEVICE_RESET_COMMAND,
                                     );
+                                    self.send_sysex_button(
+                                        ui,
+                                        "Erase storage",
+                                        OpenWareMidiSysexCommand::SYSEX_FLASH_ERASE,
+                                    );
                                 })
                             });
 
